@@ -5294,6 +5294,8 @@ export function SketchForgeEditor({
     { stage: "plane" } | { stage: "draw"; sketch: Sketch } | null
   >(null);
   const [parametricBusy, setParametricBusy] = useState(false);
+  /** The body being re-sketched, so finishing replaces it instead of adding one. */
+  const parametricEditingIdRef = useRef<string | null>(null);
   const rightPressRef = useRef<{ x: number; y: number } | null>(null);
   const { t } = useTranslation();
   const { layout, setLayout } = useEditorLayout();
@@ -7408,15 +7410,29 @@ export function SketchForgeEditor({
     (sketch: Sketch, distance: number) => {
       setParametricBusy(true);
       setNotice(translate("notice.buildingFeature"));
+      // Rebuilding an existing body replaces it in place rather than adding a
+      // second one, so its name, colour and position in the tree survive.
+      const replacing = parametricEditingIdRef.current;
+      const previous = replacing ? shapesRef.current.find((shape) => shape.id === replacing) ?? null : null;
+
       brepFeatures
         .buildSketchFeature({ sketch, regionKeys: null, operation: "new", extrude: { distance } })
         .then((body) => {
-          const shape = workplaneShapeFromFeatureBody(body, {
-            id: createLocalId("sketch-body"),
-            name: translate("name.sketchBody"),
+          const built = workplaneShapeFromFeatureBody(body, {
+            id: previous?.id ?? createLocalId("sketch-body"),
+            name: previous?.name ?? translate("name.sketchBody"),
+            existing: previous,
           });
-          commitShapes([...shapesRef.current, shape], [shape.id], translate("notice.featureBuilt"));
+          // The sketch travels with the body. Without it the profile would exist
+          // only while the window was open, and changing a dimension would mean
+          // drawing the whole thing again.
+          const shape = { ...built, parametricSketch: { sketch, extrudeDistance: distance } };
+          const next = previous
+            ? shapesRef.current.map((entry) => (entry.id === previous.id ? shape : entry))
+            : [...shapesRef.current, shape];
+          commitShapes(next, [shape.id], translate(previous ? "notice.featureRebuilt" : "notice.featureBuilt"));
           setParametricStage(null);
+          parametricEditingIdRef.current = null;
         })
         .catch((error: unknown) => {
           // The worker's message names the actual problem — an open profile, a
@@ -8615,6 +8631,19 @@ export function SketchForgeEditor({
     },
     { customControl: true, id: "sketch-create", labelKey: "sketch.extrudeTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("extrude"), isEnabled: !sketchActive },
     { customControl: true, id: "sketch-revolve", labelKey: "sketch.revolveTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("revolve"), isEnabled: !sketchActive },
+    {
+      id: "edit-parametric-sketch",
+      labelKey: "sketch.editParametric",
+      tab: "sketch",
+      groupKey: "section.create",
+      run: () => {
+        const stored = selectedShape?.parametricSketch;
+        if (!stored || !selectedShape) return;
+        parametricEditingIdRef.current = selectedShape.id;
+        setParametricStage({ stage: "draw", sketch: stored.sketch });
+      },
+      isEnabled: Boolean(selectedShape?.parametricSketch) && !sketchActive && !parametricStage,
+    },
     { customControl: true, id: "sketch-edit", labelKey: "sketch.edit", tab: "sketch", groupKey: "section.create", run: beginSketchEdit, isEnabled: selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile) },
     { id: "import", labelKey: "tool.import", tab: "utilities", groupKey: "section.manage", icon: ToolbarImportIcon, run: () => setTopPanel((current) => (current === "import" ? null : "import")), isEnabled: true },
     { id: "export", labelKey: "tool.export", tab: "utilities", groupKey: "section.manage", icon: ToolbarVectorExportIcon, run: () => setTopPanel((current) => (current === "export" ? null : "export")), isEnabled: true },
@@ -8844,7 +8873,10 @@ export function SketchForgeEditor({
             <ParametricSketchEditor
               initial={parametricStage.sketch}
               busy={parametricBusy}
-              onCancel={() => setParametricStage(null)}
+              onCancel={() => {
+                setParametricStage(null);
+                parametricEditingIdRef.current = null;
+              }}
               onFinish={finishParametricSketch}
             />
           )}

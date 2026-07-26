@@ -358,6 +358,64 @@ describe("SketchForge .skf project packages", () => {
     expect(restored.snapGrid).toBe("0.5 mm");
   });
 
+  it("carries a parametric sketch through a save and a load", async () => {
+    const bracket = shape("mesh", "bracket", {
+      parametricSketch: {
+        sketch: {
+          id: "sketch-1",
+          name: "Base",
+          plane: { kind: "base", plane: "xz", offset: 0 },
+          entities: [{ id: "e1", type: "line", a: { x: 0, y: 0 }, b: { x: 40, y: 0 } }],
+          constraints: [{ id: "c1", type: "horizontal", entity: "e1" }],
+        },
+        extrudeDistance: 12,
+      },
+    });
+
+    const restored = await importSkfProject(await exportSkfProject(input([bracket])));
+
+    // Losing the sketch would turn a parametric body back into a one-way
+    // result: it would still look right and would no longer be editable.
+    const stored = restored.shapes[0].parametricSketch;
+    expect(stored?.extrudeDistance).toBe(12);
+    expect(stored?.sketch.entities).toHaveLength(1);
+    expect(stored?.sketch.constraints[0]).toMatchObject({ type: "horizontal", entity: "e1" });
+    expect(stored?.sketch.plane).toEqual({ kind: "base", plane: "xz", offset: 0 });
+  });
+
+  it("still opens a file written before the sketch existed", async () => {
+    // Version 2 only adds an optional field, so a v1 file has to keep loading
+    // exactly as it did — that is the entire reason the minimum reader version
+    // was not raised with it.
+    const exported = await exportSkfProject(input([shape("box", "old-box")]));
+    const older = mutateProject(exported, (document) => {
+      (document as { formatVersion: number }).formatVersion = 1;
+    });
+
+    const restored = await importSkfProject(older);
+    expect(restored.shapes[0].id).toBe("old-box");
+    expect(restored.shapes[0].parametricSketch).toBeUndefined();
+  });
+
+  it("refuses a stored sketch that is not shaped like one", async () => {
+    const exported = await exportSkfProject(input([
+      shape("mesh", "bad", {
+        parametricSketch: {
+          sketch: { id: "s", name: "S", plane: { kind: "base", plane: "xz", offset: 0 }, entities: [], constraints: [] },
+          extrudeDistance: 5,
+        },
+      }),
+    ]));
+    // A `.skf` can come from anywhere and its sketch goes straight to the solver
+    // and then the CAD kernel, so it is checked rather than trusted.
+    const broken = mutateProject(exported, (document) => {
+      const node = document.states[0].nodes?.[0] ?? (document as unknown as { nodes: { definition: Record<string, unknown> }[] }).nodes[0];
+      (node.definition.parametricSketch as { extrudeDistance: unknown }).extrudeDistance = "twelve";
+    });
+
+    await expect(importSkfProject(broken)).rejects.toThrow(/extrudeDistance/);
+  });
+
   it("rejects unsupported future versions before restoring any state", async () => {
     const exported = await exportSkfProject(input([shape("box")]));
     const future = mutateProject(exported, (document) => {

@@ -416,6 +416,8 @@ export const TRANSLATIONS = {
   "sketch.circularPattern": { en: "Circular pattern", de: "Kreismuster" },
   "notice.buildingFeature": { en: "Building the body\u2026", de: "Körper wird gebaut \u2026" },
   "notice.featureBuilt": { en: "Sketch body created", de: "Skizzenkörper erstellt" },
+  "notice.featureRebuilt": { en: "Sketch body rebuilt", de: "Skizzenkörper neu gebaut" },
+  "sketch.editParametric": { en: "Edit sketch", de: "Skizze bearbeiten" },
   "notice.featureFailed": { en: "The body could not be built", de: "Der Körper konnte nicht gebaut werden" },
   "name.sketchBody": { en: "Sketch body", de: "Skizzenkörper" },
   "sketch.extrudeDistance": { en: "Extrude (mm)", de: "Extrusion (mm)" },

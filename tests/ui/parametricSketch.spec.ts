@@ -258,3 +258,38 @@ test("speaks German when the interface does", async ({ page }) => {
   await expect(page.getByTestId("constraint-perpendicular")).toHaveAttribute("aria-label", "Rechtwinklig");
   await expect(page.getByTestId("sketch-dof")).toContainText("Vollständig bestimmt");
 });
+
+test("reopens a body's sketch and rebuilds it with a new dimension", async ({ page }) => {
+  await startSketch(page);
+  await page.getByTestId("sketch-tool-rectangle").click();
+  await clickSketch(page, 0, 0);
+  await clickSketch(page, 40, 30);
+  await page.getByTestId("sketch-extrude-distance").fill("10");
+  await page.getByTestId("parametric-finish").click();
+
+  await expect.poll(() => sceneState(page).then((state) => state.shapeCount), { timeout: 90_000 }).toBe(1);
+  const first = (await sceneState(page)).shapes[0];
+  expect(first.height).toBeCloseTo(10, 1);
+
+  // The sketch travelled with the body, so it can be opened again.
+  await page.getByTestId("tab-sketch").click();
+  await page.getByTestId("tool-edit-parametric-sketch").click();
+  await expect(page.getByTestId("sketch-canvas")).toBeVisible();
+  await expect(page.locator("[data-entity-type='line']")).toHaveCount(4);
+
+  await page.getByTestId("sketch-extrude-distance").fill("25");
+  await page.getByTestId("parametric-finish").click();
+
+  // Rebuilding replaces the body rather than adding a second one, and keeps its
+  // identity — a new id would orphan its place in the tree and its name.
+  await expect
+    .poll(() => sceneState(page).then((state) => state.shapes[0]?.height), { timeout: 90_000 })
+    .toBeCloseTo(25, 1);
+  expect((await sceneState(page)).shapeCount).toBe(1);
+  expect((await sceneState(page)).shapes[0].id).toBe(first.id);
+});
+
+test("only offers the edit command for a body that has a sketch", async ({ page }) => {
+  await page.getByTestId("tab-sketch").click();
+  await expect(page.getByTestId("tool-edit-parametric-sketch")).toBeDisabled();
+});

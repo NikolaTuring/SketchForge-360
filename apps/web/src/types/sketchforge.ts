@@ -1,3 +1,5 @@
+import type { Sketch } from "@/types/sketch";
+
 export type ShapeKind =
   | "box"
   | "cylinder"
@@ -243,4 +245,17 @@ export type WorkplaneShape = {
   groupOperation?: "group" | "intersection";
   locked?: boolean;
   hidden?: boolean;
+  /**
+   * The parametric sketch this body was built from, kept so it can be reopened
+   * and rebuilt with different dimensions.
+   *
+   * Without it a sketch body is a one-way result: the profile that defines it
+   * would exist only for as long as the sketch window was open, and changing a
+   * dimension would mean drawing the whole thing again. This is what makes the
+   * body parametric rather than merely produced by a parametric tool.
+   */
+  parametricSketch?: {
+    sketch: Sketch;
+    extrudeDistance: number;
+  };
 };

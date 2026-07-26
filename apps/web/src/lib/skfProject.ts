@@ -8,7 +8,16 @@ import { normalizeSnapGrid, normalizeWorkspaceSettings } from "@/lib/workplaneSe
 import type { GridSize, ProjectAsset, ProjectAssetSourceFormat, SketchOperation, SketchRevolveSettings, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
 export const SKF_SCHEMA_ID = "com.sketchforge.project";
-export const SKF_FORMAT_VERSION = 1;
+/**
+ * Version 2 adds the optional `parametricSketch` on a shape.
+ *
+ * The addition is purely additive, so `SKF_MINIMUM_READER_VERSION` stays at 1:
+ * a v1 file opens here unchanged, and a v2 file still opens in an older build,
+ * which simply does not see the sketch. Raising the minimum would have locked
+ * every project written from today out of every release before it, to protect
+ * one optional field.
+ */
+export const SKF_FORMAT_VERSION = 2;
 export const SKF_MINIMUM_READER_VERSION = 1;
 export const SKF_CREATED_WITH_VERSION = "0.7.0";
 export const SKF_MEDIA_TYPE = "application/vnd.sketchforge.project+zip";
@@ -22,6 +31,9 @@ export const SKF_LIMITS = {
   states: 5001,
   objectsPerState: 100_000,
   features: 300_000,
+  /** Entities or constraints in one stored sketch. A profile past this is not
+   * a drawing, and the solver would be unusable long before it. */
+  sketchEntities: 20_000,
   meshNumbers: 30_000_000,
 } as const;
 
@@ -93,7 +105,7 @@ export type SkfFeatureV1 = {
 
 export type SkfProjectDocumentV1 = {
   schema: typeof SKF_SCHEMA_ID;
-  formatVersion: 1;
+  formatVersion: 1 | 2;
   minimumReaderVersion: number;
   createdWithVersion: string;
   metadata: {
@@ -357,6 +369,39 @@ function referencedSourceAssetIds(states: WorkplaneShape[][]) {
   };
   states.flat().forEach(visit);
   return ids;
+}
+
+/**
+ * Checks a stored parametric sketch before it is trusted.
+ *
+ * A `.skf` can come from anywhere, and the sketch it carries is fed straight to
+ * the solver and then to the CAD kernel. The counts are bounded for the same
+ * reason: a file claiming a million entities would freeze the tab before any
+ * error could be shown.
+ */
+function validateParametricSketch(raw: unknown, label: string) {
+  const record = objectRecord(raw, label);
+  finiteNumber(record.extrudeDistance, `${label}.extrudeDistance`);
+  const sketch = objectRecord(record.sketch, `${label}.sketch`);
+  stringValue(sketch.id, `${label}.sketch.id`);
+  stringValue(sketch.name, `${label}.sketch.name`);
+  objectRecord(sketch.plane, `${label}.sketch.plane`);
+  if (!Array.isArray(sketch.entities) || sketch.entities.length > SKF_LIMITS.sketchEntities) {
+    throw new Error(`${label}.sketch.entities is invalid`);
+  }
+  if (!Array.isArray(sketch.constraints) || sketch.constraints.length > SKF_LIMITS.sketchEntities) {
+    throw new Error(`${label}.sketch.constraints is invalid`);
+  }
+  sketch.entities.forEach((entity, index) => {
+    const item = objectRecord(entity, `${label}.sketch.entities[${index}]`);
+    stringValue(item.id, `${label}.sketch.entities[${index}].id`);
+    stringValue(item.type, `${label}.sketch.entities[${index}].type`);
+  });
+  sketch.constraints.forEach((constraint, index) => {
+    const item = objectRecord(constraint, `${label}.sketch.constraints[${index}]`);
+    stringValue(item.id, `${label}.sketch.constraints[${index}].id`);
+    stringValue(item.type, `${label}.sketch.constraints[${index}].type`);
+  });
 }
 
 async function serializeShapeNode(
@@ -789,6 +834,7 @@ function validateShapeDefinition(definition: Record<string, unknown>, label: str
     throw new Error(`${label} contains inline package-only geometry fields`);
   }
   if (definition.sketchProfile) validateSketchProfile(definition.sketchProfile, `${label}.sketchProfile`);
+  if (definition.parametricSketch !== undefined) validateParametricSketch(definition.parametricSketch, `${label}.parametricSketch`);
   if (definition.sketchOperation !== undefined && definition.sketchOperation !== "extrude" && definition.sketchOperation !== "revolve") {
     throw new Error(`${label}.sketchOperation is invalid`);
   }
@@ -866,7 +912,9 @@ async function validateDocumentAndAssets(raw: unknown, files: ArchiveFiles) {
   if (document.formatVersion > SKF_FORMAT_VERSION) {
     throw new Error(`This project uses .skf format ${document.formatVersion}, which requires a newer SketchForge version`);
   }
-  if (document.formatVersion < SKF_FORMAT_VERSION) throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
+  if (document.formatVersion < SKF_MINIMUM_READER_VERSION) {
+    throw new Error(`Packaged .skf format ${document.formatVersion} requires migration support that is not available`);
+  }
   if (!Number.isInteger(document.minimumReaderVersion) || document.minimumReaderVersion > SKF_FORMAT_VERSION) {
     throw new Error("This project requires a newer SketchForge reader and was not opened");
   }
