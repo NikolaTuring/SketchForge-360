@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Home, Minus, MousePointer2, Plus, Ruler, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Frame, Home, Minus, MousePointer2, Plus, Ruler, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type DragEvent, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import * as THREE from "three";
 import { Brush, Evaluator, HOLLOW_INTERSECTION } from "three-bvh-csg";
@@ -3379,6 +3379,26 @@ export function WorkplaneViewport({
     }
   }, []);
 
+  /**
+   * Frames the selection, or the whole model when nothing is selected.
+   *
+   * Falling back to everything is deliberate: someone who has scrolled into
+   * empty space has nothing selected *and* nothing to select, so demanding a
+   * selection first would refuse exactly when the command is needed.
+   */
+  const fitView = useCallback(() => {
+    const state = threeRef.current;
+    if (!state) {
+      return;
+    }
+    const ids = selectedIds.length > 0 ? selectedIds : shapes.map((shape) => shape.id);
+    if (!fitCameraToShapes(state, shapes, ids)) {
+      resetCamera(state);
+      state.needsRender = true;
+    }
+    syncViewCube(state, viewCubeRef.current);
+  }, [selectedIds, shapes]);
+
   const setViewCubeFace = useCallback((face: ViewCubeFace) => {
     const state = threeRef.current;
     if (!state) {
@@ -3575,7 +3595,13 @@ export function WorkplaneViewport({
         setRulerMoveMode(false);
         rulerPointDragRef.current = null;
         setRulerToolsOpen(false);
-      } else if (key === "f" || event.key === "Home") {
+      } else if (key === "f") {
+        // F frames what you are working on; Home returns to the start view.
+        // They used to be the same key, which meant the only way to recover a
+        // lost model also threw away the angle you had set up.
+        event.preventDefault();
+        fitView();
+      } else if (event.key === "Home") {
         event.preventDefault();
         resetView();
       } else if (event.key === "+" || event.key === "=") {
@@ -3589,7 +3615,7 @@ export function WorkplaneViewport({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [resetView, rulerToolsOpen, setRulerActive, zoomCamera]);
+  }, [fitView, resetView, rulerToolsOpen, setRulerActive, zoomCamera]);
 
   return (
     <main className="workplane-stage">
@@ -3616,6 +3642,9 @@ export function WorkplaneViewport({
             </button>
             <button aria-label="Home" onClick={resetView}>
               <Home size={24} strokeWidth={2.25} />
+            </button>
+            <button data-testid="camera-fit" aria-label="Fit to selection" title="Fit to selection (F)" onClick={fitView}>
+              <Frame size={24} strokeWidth={2.25} />
             </button>
             <button aria-label="Zoom in" onClick={() => zoomCamera(0.7)}>
               <Plus size={28} strokeWidth={2.15} />
@@ -3912,6 +3941,56 @@ function setCameraToViewFace(state: ThreeState, face: ViewCubeFace) {
   state.camera.updateProjectionMatrix();
   state.controls.update();
   state.needsRender = true;
+}
+
+/** How much emptier than the selection the framed view is. */
+const FIT_MARGIN = 1.25;
+
+/**
+ * Frames a set of bodies without changing which way the camera is looking.
+ *
+ * Keeping the direction is the whole point: "fit" answers "I have lost the
+ * model", not "put me back at the start view" — that is what Home is for. A fit
+ * that also reorients throws away the angle someone spent time getting right.
+ *
+ * The distance comes from the bounding sphere and the *smaller* of the two
+ * fields of view — vertical on a wide window, horizontal on a tall one. Using
+ * the vertical field alone leaves a wide selection cropped on a narrow window,
+ * which is exactly the moment someone reaches for this.
+ */
+function fitCameraToShapes(state: ThreeState, shapes: WorkplaneShape[], ids: string[]) {
+  const frame = selectionFrameForShapes(shapes, ids);
+  if (!frame) {
+    return false;
+  }
+
+  const corners = selectionFrameCorners(frame);
+  const center = new THREE.Vector3();
+  corners.forEach((corner) => center.add(corner));
+  center.multiplyScalar(1 / corners.length);
+  // A floor on the radius stops a flat plate or a hairline body from pulling the
+  // camera inside its own near plane.
+  const radius = Math.max(1, ...corners.map((corner) => corner.distanceTo(center)));
+
+  const verticalFov = THREE.MathUtils.degToRad(state.camera.fov);
+  const horizontalFov = 2 * Math.atan(Math.tan(verticalFov / 2) * state.camera.aspect);
+  const fov = Math.min(verticalFov, horizontalFov);
+  const distance = clamp((radius * FIT_MARGIN) / Math.sin(fov / 2), 22, 4200);
+
+  const direction = state.camera.position.clone().sub(state.controls.target);
+  // A degenerate offset would normalise to NaN and lose the camera entirely.
+  if (direction.lengthSq() < 1e-6) {
+    direction.copy(CAMERA_HOME).sub(CAMERA_TARGET);
+  }
+  direction.normalize();
+
+  state.controls.target.copy(center);
+  state.camera.position.copy(center).add(direction.multiplyScalar(distance));
+  state.camera.lookAt(center);
+  state.camera.updateProjectionMatrix();
+  state.controls.update();
+  state.needsRender = true;
+  return true;
 }
 
 function constrainCamera(state: ThreeState, workspace: WorkspaceSettings) {

@@ -145,6 +145,12 @@ function BodyRow({
             type="button"
             aria-pressed={selected}
             onClick={(event) => onSelect(shape.id, event.ctrlKey || event.metaKey || event.shiftKey)}
+            // Right-click selects, then lets the event through to the editor's
+            // context menu. Without this the menu would open against whatever
+            // was selected before, which is not the row under the cursor.
+            onContextMenu={() => {
+              if (!selected) onSelect(shape.id, false);
+            }}
             onDoubleClick={() => {
               setDraft(shape.name);
               setRenaming(true);

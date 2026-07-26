@@ -129,6 +129,41 @@ export function findCommand(commands: readonly EditorCommand[], id: string): Edi
 }
 
 /**
+ * The right-click menu, as ids grouped by a separator.
+ *
+ * A context menu is a shortlist, not a second copy of the ribbon: it has to fit
+ * on screen next to the cursor, and a long one is slower to read than the
+ * ribbon it was meant to save a trip to. Ordered by how often the command is
+ * reached for, not by how the ribbon groups it.
+ */
+export const CONTEXT_MENU_GROUPS: readonly (readonly string[])[] = [
+  ["copy", "paste", "duplicate"],
+  ["group", "ungroup", "intersect", "separate-parts"],
+  ["fillet", "chamfer"],
+  ["align", "mirror", "snap", "drop-to-workplane"],
+  ["hide-selected", "delete"],
+];
+
+/**
+ * Resolves the context menu against the registry.
+ *
+ * Unavailable commands are dropped rather than greyed out — unlike the ribbon,
+ * where a fixed layout makes a missing button confusing, a menu that appears at
+ * the cursor has no layout to preserve, and a shorter list is easier to aim at.
+ * A group whose commands all dropped out disappears with them, so the menu never
+ * shows two separators in a row.
+ */
+export function contextMenuGroups(commands: readonly EditorCommand[]): EditorCommand[][] {
+  return CONTEXT_MENU_GROUPS
+    .map((ids) =>
+      ids
+        .map((id) => findCommand(commands, id))
+        .filter((command): command is EditorCommand => Boolean(command?.isEnabled)),
+    )
+    .filter((group) => group.length > 0);
+}
+
+/**
  * Runs a command by id, but only when it is currently available.
  *
  * Every entry point — ribbon, context menu, search, keyboard — goes through

@@ -5,6 +5,18 @@ import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
+import { ContextMenu, type ContextMenuState } from "@/components/editor/ContextMenu";
+/**
+ * How far the pointer may travel between right-press and release and still
+ * count as a click rather than an orbit. Generous enough for a hand that is not
+ * perfectly still, short enough that a deliberate rotation never opens a menu.
+ */
+const RIGHT_CLICK_DRAG_SLOP = 5;
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
 import { ModelBrowser } from "@/components/editor/ModelBrowser";
 import { QuickAccessBar } from "@/components/editor/QuickAccessBar";
 import { StatusBar } from "@/components/editor/StatusBar";
@@ -5264,6 +5276,8 @@ export function SketchForgeEditor({
   const [workplaneMode, setWorkplaneMode] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const rightPressRef = useRef<{ x: number; y: number } | null>(null);
   const { t } = useTranslation();
   const { layout, setLayout } = useEditorLayout();
   const browserOpen = layout.browserOpen;
@@ -8588,7 +8602,31 @@ export function SketchForgeEditor({
         onOpenCommandSearch={() => setCommandSearchOpen(true)}
         commands={editorCommands}
       />
-      <div className={`editor-body ${browserOpen ? "with-browser" : ""}`}>
+      <div
+        className={`editor-body ${browserOpen ? "with-browser" : ""}`}
+        onContextMenu={(event) => {
+          // Only suppress the browser's own menu where the editor has something
+          // to offer. Inside a text field the native menu — cut, paste,
+          // spelling — is the useful one, and replacing it is a regression.
+          if (isTextEntryTarget(event.target)) return;
+          event.preventDefault();
+        }}
+        onPointerDown={(event) => {
+          if (event.button === 2) rightPressRef.current = { x: event.clientX, y: event.clientY };
+        }}
+        onPointerUp={(event) => {
+          const press = rightPressRef.current;
+          rightPressRef.current = null;
+          if (event.button !== 2 || !press || isTextEntryTarget(event.target)) return;
+          // The right button also orbits the camera, so the menu opens on
+          // release and only when the pointer stayed put. Opening it on press
+          // would put a menu in front of the model every time someone rotated
+          // the view — and which of the two events the browser even reports
+          // first differs by platform, so release is the only reliable moment.
+          if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > RIGHT_CLICK_DRAG_SLOP) return;
+          setContextMenu({ x: event.clientX, y: event.clientY });
+        }}
+      >
         {browserOpen ? (
           <ModelBrowser
             shapes={shapes}
@@ -8796,6 +8834,7 @@ export function SketchForgeEditor({
         }}
       />
       <CommandSearch commands={editorCommands} open={commandSearchOpen} onOpenChange={setCommandSearchOpen} />
+      <ContextMenu commands={editorCommands} state={contextMenu} onClose={() => setContextMenu(null)} />
       {/*
         The notice used to float over the model as a toast. It now lives in the
         status bar instead: a message that overlaps the thing it is commenting
