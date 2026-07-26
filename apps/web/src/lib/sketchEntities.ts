@@ -243,7 +243,14 @@ export function polygonEntities(center: Vec2, radius: number, sides: number, ins
   return { entities: lines, constraints };
 }
 
-/** Slot: two parallel lines closed by semicircular arcs, tangent at each join. */
+/**
+ * Slot: two parallel lines closed by semicircular end caps, tangent at each join.
+ *
+ * Arcs are counter-clockwise by invariant, so an end cap that has to bulge
+ * *away* from the slot is stored counter-clockwise and simply traversed
+ * backwards when the loop is walked. That is why the coincidences below pair
+ * end-to-end rather than following one uniform direction around the shape.
+ */
 export function slotEntities(start: Vec2, end: Vec2, radius: number, construction = false): EntityGroup {
   const axis = subVec2(end, start);
   const axisLength = lengthVec2(axis);
@@ -253,23 +260,26 @@ export function slotEntities(start: Vec2, end: Vec2, radius: number, constructio
   const normal = { x: -direction.y, y: direction.x };
   const offset = scaleVec2(normal, radius);
   const axisAngle = Math.atan2(direction.y, direction.x);
+  const quarter = Math.PI / 2;
 
+  // Sweeping through `axisAngle` puts the cap beyond `end`; sweeping through
+  // `axisAngle + π` puts the other cap beyond `start`.
   const topLine = createLine(addVec2(start, offset), addVec2(end, offset), construction);
-  const endArc = createArc(end, radius, axisAngle + Math.PI / 2, axisAngle - Math.PI / 2, construction);
+  const endArc = createArc(end, radius, axisAngle - quarter, axisAngle + quarter, construction);
   const bottomLine = createLine(subVec2(end, offset), subVec2(start, offset), construction);
-  const startArc = createArc(start, radius, axisAngle - Math.PI / 2, axisAngle + Math.PI / 2, construction);
+  const startArc = createArc(start, radius, axisAngle + quarter, axisAngle + 3 * quarter, construction);
 
-  const ordered: SketchEntity[] = [topLine, endArc, bottomLine, startArc];
-  const constraints: SketchConstraint[] = ordered.map((entity, index) =>
-    coincident(pointRef(entity.id, "end"), pointRef(ordered[(index + 1) % ordered.length].id, "start")),
-  );
-  constraints.push(
+  const constraints: SketchConstraint[] = [
+    coincident(pointRef(topLine.id, "end"), pointRef(endArc.id, "end")),
+    coincident(pointRef(endArc.id, "start"), pointRef(bottomLine.id, "start")),
+    coincident(pointRef(bottomLine.id, "end"), pointRef(startArc.id, "end")),
+    coincident(pointRef(startArc.id, "start"), pointRef(topLine.id, "start")),
     equal(startArc.id, endArc.id),
     tangent(topLine.id, endArc.id),
     tangent(bottomLine.id, startArc.id),
-  );
+  ];
 
-  return { entities: ordered, constraints };
+  return { entities: [topLine, endArc, bottomLine, startArc], constraints };
 }
 
 /**

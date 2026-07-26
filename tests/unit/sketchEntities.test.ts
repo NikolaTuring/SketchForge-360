@@ -99,20 +99,37 @@ describe("polygonEntities", () => {
 });
 
 describe("slotEntities", () => {
-  it("builds two lines and two arcs joined end to end", () => {
+  it("builds two lines and two arcs whose ends meet", () => {
     const { entities, constraints } = slotEntities(vec2(0, 0), vec2(30, 0), 5);
+    const [topLine, endArc, bottomLine, startArc] = entities;
 
     expect(entities.map((entity) => entity.type)).toEqual(["line", "arc", "line", "arc"]);
     expect(constraints.filter((constraint) => constraint.type === "coincident")).toHaveLength(4);
     expect(constraints.filter((constraint) => constraint.type === "tangent")).toHaveLength(2);
 
-    // Each entity's end must land on the next entity's start for the loop to close.
-    entities.forEach((entity, index) => {
-      const end = entityPoint(entity, "end");
-      const nextStart = entityPoint(entities[(index + 1) % entities.length], "start");
-      expect(end?.x).toBeCloseTo(nextStart?.x ?? Number.NaN, 9);
-      expect(end?.y).toBeCloseTo(nextStart?.y ?? Number.NaN, 9);
+    // Arcs are counter-clockwise by invariant, so the caps are stored in the
+    // direction that bulges outwards and the loop meets them end-to-end.
+    const meets = (a: ReturnType<typeof entityPoint>, b: ReturnType<typeof entityPoint>) => {
+      expect(a?.x).toBeCloseTo(b?.x ?? Number.NaN, 9);
+      expect(a?.y).toBeCloseTo(b?.y ?? Number.NaN, 9);
+    };
+    meets(entityPoint(topLine, "end"), entityPoint(endArc, "end"));
+    meets(entityPoint(endArc, "start"), entityPoint(bottomLine, "start"));
+    meets(entityPoint(bottomLine, "end"), entityPoint(startArc, "end"));
+    meets(entityPoint(startArc, "start"), entityPoint(topLine, "start"));
+  });
+
+  it("bulges both end caps away from the slot axis", () => {
+    const { entities } = slotEntities(vec2(0, 0), vec2(30, 0), 5);
+    const [, endArc, , startArc] = entities as [unknown, SketchArcEntity, unknown, SketchArcEntity];
+
+    // Midpoint of each cap must sit beyond the axis end it caps.
+    const capMidpoint = (arc: SketchArcEntity) => ({
+      x: arc.c.x + arc.r * Math.cos((arc.startAngle + arc.endAngle) / 2),
+      y: arc.c.y + arc.r * Math.sin((arc.startAngle + arc.endAngle) / 2),
     });
+    expect(capMidpoint(endArc).x).toBeCloseTo(35, 9);
+    expect(capMidpoint(startArc).x).toBeCloseTo(-5, 9);
   });
 
   it("returns nothing for a degenerate slot", () => {
