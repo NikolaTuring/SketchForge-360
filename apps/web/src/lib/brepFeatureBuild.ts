@@ -100,6 +100,23 @@ export function bodyFromShape(kernel: OcctKernel, shape: ShapeHandle): BrepFeatu
   const positions = new Float32Array(mesh.positions);
   const normals = new Float32Array(mesh.normals);
   const indices = new Uint32Array(mesh.indices);
+  const bounds = boundsOf(positions);
+
+  /*
+   * The STEP text is emitted from a copy moved into the body's own local frame
+   * — centred in x and z, sitting on y = 0 — because that is the frame the
+   * mesh is stored in and the frame the exporter reads it back in. Emitting it
+   * where the kernel happened to build it produces a STEP file whose contents
+   * are correct and whose position is wrong by the body's placement, which is
+   * invisible until someone opens the export in another program.
+   */
+  const local = kernel.translate(shape, -bounds.center.x, -(bounds.center.y - bounds.height / 2), -bounds.center.z);
+  let stepText: string;
+  try {
+    stepText = kernel.exportStep(local);
+  } finally {
+    kernel.release(local);
+  }
 
   return {
     positions,
@@ -107,10 +124,10 @@ export function bodyFromShape(kernel: OcctKernel, shape: ShapeHandle): BrepFeatu
     indices,
     triangleCount: mesh.triangleCount,
     brep: kernel.toBREP(shape),
-    stepText: kernel.exportStep(shape),
+    stepText,
     displayEdges: displayEdgesOf(kernel, shape),
     volume: kernel.getVolume(shape),
-    bounds: boundsOf(positions),
+    bounds,
   };
 }
 

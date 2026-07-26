@@ -82,6 +82,19 @@ describe("the feature worker's payload", () => {
     expect(body.stepText).toContain("ISO-10303-21");
     expect(body.stepText).toContain("MANIFOLD_SOLID_BREP");
 
+    // The STEP has to be in the body's own local frame, matching the mesh: a
+    // file whose contents are right and whose position is off by the body's
+    // placement looks fine here and lands in the wrong place in another program.
+    const stepCoordinates = [...body.stepText.matchAll(/CARTESIAN_POINT\s*\(\s*''\s*,\s*\(([-\d.eE,\s]+)\)/g)]
+      .map((match) => match[1].split(",").map((part) => Number.parseFloat(part)))
+      .filter((point) => point.length === 3 && point.every(Number.isFinite));
+    expect(stepCoordinates.length).toBeGreaterThan(0);
+    // The plate spans 40 x 30 centred on the origin, 10 tall from y = 0. In any
+    // axis order that means nothing beyond 20 and nothing below -20.
+    stepCoordinates.forEach((point) => {
+      point.forEach((component) => expect(Math.abs(component)).toBeLessThanOrEqual(20.001));
+    });
+
     // Twelve edges on a box; the display wireframe is what draws them.
     expect(body.displayEdges.length).toBe(12);
     body.displayEdges.forEach((edge) => expect(edge.points.length % 3).toBe(0));

@@ -73,15 +73,52 @@ test("recognises the six planes of an imported box", async ({ page }) => {
   await expect(tool(page, "analyze-mesh")).toBeEnabled();
   await tool(page, "analyze-mesh").click();
 
-  // The worker loads a 22 MB kernel on some paths, so this is given room.
-  await expect
-    .poll(async () => (await sceneState(page)).notice, { timeout: 60_000 })
-    .toMatch(/6 planes/);
+  await expect(page.getByTestId("mesh-convert-panel")).toBeVisible();
+  await expect(page.getByTestId("mesh-count-plane")).toHaveText("6", { timeout: 60_000 });
+  await expect(page.getByTestId("mesh-count-cylinder")).toHaveText("0");
+  await expect(page.getByTestId("mesh-coverage")).toHaveText("100%");
+  await expect(page.getByTestId("mesh-triangles")).toHaveText("12");
 
-  const notice = (await sceneState(page)).notice;
-  // Honest reporting: how much of the surface was actually accounted for.
-  expect(notice).toMatch(/100% of the surface/);
-  expect(notice).not.toMatch(/not closed/);
+  // The verdict is the thing worth knowing first: a mesh that is not closed
+  // cannot become a solid however well its surfaces were recognised.
+  await expect(page.getByTestId("mesh-verdict")).toContainText("closed");
+  await expect(page.getByTestId("mesh-verdict")).toHaveClass(/good/);
+  await expect(page.getByTestId("mesh-leftover")).toHaveCount(0);
+});
+
+test("clears a stale result when a tolerance changes", async ({ page }) => {
+  await importBox(page);
+  await page.getByTestId("tab-mesh").click();
+  await tool(page, "analyze-mesh").click();
+  await expect(page.getByTestId("mesh-convert-report")).toBeVisible({ timeout: 60_000 });
+
+  await page.getByTestId("mesh-angle-tolerance").fill("30");
+
+  // Leaving old numbers beside new settings is how someone ends up trusting a
+  // result that was never produced.
+  await expect(page.getByTestId("mesh-convert-report")).toHaveCount(0);
+
+  await page.getByTestId("mesh-convert-run").click();
+  await expect(page.getByTestId("mesh-count-plane")).toHaveText("6", { timeout: 60_000 });
+});
+
+test("reports an open mesh as not convertible", async ({ page }) => {
+  // A single triangle: every edge is a boundary edge.
+  await page.getByTestId("import-file-input").setInputFiles({
+    name: "sliver.stl",
+    mimeType: "model/stl",
+    buffer: Buffer.from(
+      "solid s\n  facet normal 0 0 0\n    outer loop\n      vertex 0 0 0\n      vertex 10 0 0\n      vertex 0 10 0\n    endloop\n  endfacet\nendsolid s\n",
+      "utf8",
+    ),
+  });
+  await expectShapeCount(page, 1);
+
+  await page.getByTestId("tab-mesh").click();
+  await tool(page, "analyze-mesh").click();
+
+  await expect(page.getByTestId("mesh-verdict")).toHaveClass(/bad/, { timeout: 60_000 });
+  await expect(page.getByTestId("mesh-verdict")).toContainText("3 open edges");
 });
 
 test("reports in the chosen language", async ({ page }) => {

@@ -7,6 +7,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
 import { ContextMenu, type ContextMenuState } from "@/components/editor/ContextMenu";
 import { useBrepFeatureWorker } from "@/lib/brepFeatureClient";
+import { MeshConvertPanel } from "@/components/workplane/MeshConvertPanel";
+import type { MeshConversionReport } from "@/lib/brepFeatureTypes";
+import type { MeshConversionSettings } from "@/lib/meshToBrep";
 import { ParametricSketchEditor } from "@/components/sketch/ParametricSketchEditor";
 import { SketchPlanePicker } from "@/components/sketch/SketchPlanePicker";
 import { workplaneShapeFromFeatureBody } from "@/lib/parametricBody";
@@ -5294,6 +5297,10 @@ export function SketchForgeEditor({
     { stage: "plane" } | { stage: "draw"; sketch: Sketch } | null
   >(null);
   const [parametricBusy, setParametricBusy] = useState(false);
+  const [meshConvertOpen, setMeshConvertOpen] = useState(false);
+  const [meshReport, setMeshReport] = useState<MeshConversionReport | null>(null);
+  const [meshBusy, setMeshBusy] = useState(false);
+  const [meshSettings, setMeshSettings] = useState<MeshConversionSettings>({});
   /** The body being re-sketched, so finishing replaces it instead of adding one. */
   const parametricEditingIdRef = useRef<string | null>(null);
   const rightPressRef = useRef<{ x: number; y: number } | null>(null);
@@ -7451,19 +7458,24 @@ export function SketchForgeEditor({
       setNotice(translate("notice.selectImportedMesh"));
       return;
     }
+    setMeshConvertOpen(true);
+    setMeshBusy(true);
     setNotice(translate("notice.analyzingMesh"));
     brepFeatures
-      .convertMesh(Float32Array.from(positions))
+      .convertMesh(Float32Array.from(positions), meshSettings)
       .then((report) => {
-        // The summary is deliberately the kernel-free description rather than a
-        // verdict: "6 planes, 1 cylinder — 100% of the surface" tells the user
-        // what was found, and leaves the decision to rebuild to them.
-        setNotice(report.manifold ? report.summary : `${report.summary} ${translate("notice.meshNotClosed")}`);
+        setMeshReport(report);
+        // The summary states what was found rather than passing a verdict:
+        // "6 planes, 1 cylinder — 100% of the surface" leaves the decision to
+        // rebuild with the person who knows what the part is.
+        setNotice(report.summary);
       })
       .catch((error: unknown) => {
+        setMeshReport(null);
         setNotice(error instanceof Error ? error.message : translate("notice.meshAnalysisFailed"));
-      });
-  }, [brepFeatures, selectedMesh]);
+      })
+      .finally(() => setMeshBusy(false));
+  }, [brepFeatures, meshSettings, selectedMesh]);
 
   const separateSelectedParts = useCallback(() => {
     if (selectedShapes.length !== 1 || !selectedShape) {
@@ -8881,6 +8893,26 @@ export function SketchForgeEditor({
             />
           )}
         </div>
+      ) : null}
+      {meshConvertOpen && selectedMesh ? (
+        <MeshConvertPanel
+          bodyName={selectedMesh.name}
+          report={meshReport}
+          busy={meshBusy}
+          settings={meshSettings}
+          onSettingsChange={(next) => {
+            setMeshSettings(next);
+            // A changed tolerance invalidates the answer on screen. Leaving the
+            // old numbers up next to new settings is how someone ends up
+            // trusting a result that was never produced.
+            setMeshReport(null);
+          }}
+          onRun={analyzeSelectedMesh}
+          onClose={() => {
+            setMeshConvertOpen(false);
+            setMeshReport(null);
+          }}
+        />
       ) : null}
       {edgeModifier ? (
         <EdgeModifierPanel
