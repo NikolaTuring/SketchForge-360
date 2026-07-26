@@ -65,7 +65,7 @@ describe("editor layout", () => {
     setEditorLayout({ browserWidth: 320 });
     setEditorLayout({ browserOpen: false });
 
-    expect(getEditorLayout()).toEqual({ browserOpen: false, browserWidth: 320, propertiesOpen: true });
+    expect(getEditorLayout()).toEqual({ browserOpen: false, browserWidth: 320 });
   });
 
   it("clamps a width below the readable minimum", () => {

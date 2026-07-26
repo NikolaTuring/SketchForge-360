@@ -16,14 +16,11 @@ export type EditorLayout = {
   /** The model browser on the left. */
   browserOpen: boolean;
   browserWidth: number;
-  /** The properties dock on the right. */
-  propertiesOpen: boolean;
 };
 
 export const DEFAULT_LAYOUT: EditorLayout = {
   browserOpen: true,
   browserWidth: 268,
-  propertiesOpen: true,
 };
 
 /**
@@ -38,10 +35,11 @@ export const MIN_BROWSER_WIDTH = 180;
 export const MAX_BROWSER_WIDTH = 480;
 
 /**
- * Below this the docks stop being columns and become overlay drawers.
+ * Below this the browser stops being a column and becomes an overlay drawer.
  *
- * At 1100 px a browser dock plus a properties dock leave the viewport too
- * narrow to model in — the panels would win an argument they should lose.
+ * At 1100 px the dock plus the shape inspector leave the viewport too narrow to
+ * model in, and the panels would win an argument the model should win. Kept in
+ * step with the media query in `globals.css`.
  */
 export const DOCK_OVERLAY_BREAKPOINT = 1100;
 
@@ -61,7 +59,6 @@ function parseLayout(raw: string | null): EditorLayout {
     return {
       browserOpen: typeof record.browserOpen === "boolean" ? record.browserOpen : DEFAULT_LAYOUT.browserOpen,
       browserWidth: clampWidth(record.browserWidth),
-      propertiesOpen: typeof record.propertiesOpen === "boolean" ? record.propertiesOpen : DEFAULT_LAYOUT.propertiesOpen,
     };
   } catch {
     // A corrupt entry is not worth reporting to someone who wanted to model.
@@ -107,11 +104,7 @@ export function setEditorLayout(patch: Partial<EditorLayout>) {
     ...patch,
     browserWidth: clampWidth(patch.browserWidth ?? previous.browserWidth),
   };
-  if (
-    next.browserOpen === previous.browserOpen
-    && next.browserWidth === previous.browserWidth
-    && next.propertiesOpen === previous.propertiesOpen
-  ) {
+  if (next.browserOpen === previous.browserOpen && next.browserWidth === previous.browserWidth) {
     return;
   }
 
