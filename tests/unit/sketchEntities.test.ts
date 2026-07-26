@@ -160,14 +160,28 @@ describe("arcThroughThreePoints", () => {
 });
 
 describe("sketch plane frames", () => {
-  it("maps the XZ ground plane so sketch (u, v) matches the legacy (x, z)", () => {
+  it("gives every base plane an outward-pointing normal", () => {
+    // A positive extrude distance has to grow away from the plane, so the
+    // ground plane's normal must be +Y rather than into the model.
+    const expectNormal = (plane: "xy" | "xz" | "yz", expected: { x: number; y: number; z: number }) => {
+      const normal = frameNormal(sketchFrame({ kind: "base", plane, offset: 0 }));
+      expect(normal.x).toBeCloseTo(expected.x, 12);
+      expect(normal.y).toBeCloseTo(expected.y, 12);
+      expect(normal.z).toBeCloseTo(expected.z, 12);
+    };
+    expectNormal("xz", { x: 0, y: 1, z: 0 });
+    expectNormal("xy", { x: 0, y: 0, z: 1 });
+    expectNormal("yz", { x: 1, y: 0, z: 0 });
+  });
+
+  it("maps ground-plane sketch coordinates onto the world with v opposite to z", () => {
     const frame = sketchFrame({ kind: "base", plane: "xz", offset: 0 });
-    expect(sketchPointToWorld(frame, vec2(3, 7))).toEqual({ x: 3, y: 0, z: 7 });
+    expect(sketchPointToWorld(frame, vec2(3, 7))).toEqual({ x: 3, y: 0, z: -7 });
   });
 
   it("offsets a base plane along its own normal", () => {
     const frame = sketchFrame({ kind: "base", plane: "xz", offset: 12 });
-    expect(sketchPointToWorld(frame, vec2(0, 0)).y).toBeCloseTo(-12, 12);
+    expect(sketchPointToWorld(frame, vec2(0, 0)).y).toBeCloseTo(12, 12);
   });
 
   it("round-trips world and sketch coordinates on an arbitrary plane", () => {
@@ -223,8 +237,8 @@ describe("legacySketchProfileToSketch", () => {
   it("converts curved segments into cubic splines through their handles", () => {
     const sketch = legacySketchProfileToSketch({
       points: [
-        { id: "p1", x: 0, z: 0, handleOut: { x: 4, z: 0 } },
-        { id: "p2", x: 10, z: 0, handleIn: { x: 6, z: 4 } },
+        { id: "p1", x: 0, z: 2, handleOut: { x: 4, z: 3 } },
+        { id: "p2", x: 10, z: 6, handleIn: { x: 6, z: 4 } },
       ],
       segments: [{ id: "s1", startId: "p1", endId: "p2", kind: "bezier" }],
     });
@@ -233,7 +247,9 @@ describe("legacySketchProfileToSketch", () => {
     const spline = sketch.entities[0] as SketchSplineEntity;
     expect(spline.type).toBe("spline");
     expect(spline.degree).toBe(3);
-    expect(spline.ctrl).toEqual([vec2(0, 0), vec2(4, 0), vec2(6, 4), vec2(10, 0)]);
+    // Ground-plane sketch v runs opposite to world z, so the stored z values
+    // come back negated and the geometry stays exactly where it was.
+    expect(spline.ctrl).toEqual([vec2(0, -2), vec2(4, -3), vec2(6, -4), vec2(10, -6)]);
   });
 
   it("keeps isolated points and carries reference images across", () => {
@@ -257,6 +273,7 @@ describe("legacySketchProfileToSketch", () => {
 
     expect(sketch.entities).toHaveLength(1);
     expect(sketch.entities[0].type).toBe("point");
+    expect(sketch.entities[0].type === "point" && sketch.entities[0].p).toEqual(vec2(3, -4));
     expect(sketch.images).toEqual([image]);
   });
 

@@ -318,12 +318,18 @@ export function arcThroughThreePoints(start: Vec2, through: Vec2, end: Vec2, con
 // Plane frames
 // ---------------------------------------------------------------------------
 
+// SketchForge is Y-up. Each base plane is right-handed with its normal pointing
+// the way a user considers "out of" that plane — +Z for the front plane, +Y for
+// the ground plane, +X for the right plane. That invariant is what makes a
+// positive extrude distance grow away from the plane instead of into the model.
+//
+// It is why the ground plane's second axis is −Z rather than +Z: `xAxis × yAxis`
+// has to come out as +Y. Sketch v therefore runs opposite to world z on this
+// plane, which the legacy migration accounts for.
 const BASE_PLANE_FRAMES: Record<BasePlaneName, SketchFrame> = {
-  // SketchForge is Y-up. XZ is the ground workplane the legacy sketcher used, so
-  // its (u, v) maps straight onto the old (x, z) coordinates.
   xy: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: 1, z: 0 } },
-  xz: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: 0, z: 1 } },
-  yz: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 0, y: 0, z: 1 }, yAxis: { x: 0, y: 1, z: 0 } },
+  xz: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 1, y: 0, z: 0 }, yAxis: { x: 0, y: 0, z: -1 } },
+  yz: { origin: { x: 0, y: 0, z: 0 }, xAxis: { x: 0, y: 0, z: -1 }, yAxis: { x: 0, y: 1, z: 0 } },
 };
 
 export function crossVec3(a: Vec3, b: Vec3): Vec3 {
@@ -399,6 +405,10 @@ export function worldPointToSketch(frame: SketchFrame, point: Vec3): Vec2 {
  * profile stays closed while the user drags it. Nothing else is constrained, so
  * the degrees-of-freedom counter tells the truth about an imported sketch rather
  * than claiming it is fully defined.
+ *
+ * Legacy sketches live on the ground plane in (x, z). Sketch v runs opposite to
+ * world z there (see `BASE_PLANE_FRAMES`), so z is negated on the way in and the
+ * geometry lands exactly where it always was.
  */
 export function legacySketchProfileToSketch(
   profile: SketchProfile,
@@ -422,8 +432,8 @@ export function legacySketchProfileToSketch(
     const end = legacyPoints.get(segment.endId);
     if (!start || !end) return;
 
-    const startPoint = vec2(start.x, start.z);
-    const endPoint = vec2(end.x, end.z);
+    const startPoint = vec2(start.x, -start.z);
+    const endPoint = vec2(end.x, -end.z);
 
     if (segment.kind === "line" || !segment.kind) {
       const line = createLine(startPoint, endPoint);
@@ -434,8 +444,8 @@ export function legacySketchProfileToSketch(
     }
 
     // Bezier and smooth segments both store cubic handles on their endpoints.
-    const outHandle = start.handleOut ? vec2(start.handleOut.x, start.handleOut.z) : startPoint;
-    const inHandle = end.handleIn ? vec2(end.handleIn.x, end.handleIn.z) : endPoint;
+    const outHandle = start.handleOut ? vec2(start.handleOut.x, -start.handleOut.z) : startPoint;
+    const inHandle = end.handleIn ? vec2(end.handleIn.x, -end.handleIn.z) : endPoint;
     const spline = createSpline([startPoint, outHandle, inHandle, endPoint], 3);
     entities.push(spline);
     recordEndpoint(segment.startId, pointRef(spline.id, "start"));
@@ -447,7 +457,7 @@ export function legacySketchProfileToSketch(
   const usedLegacyIds = new Set(profile.segments.flatMap((segment) => [segment.startId, segment.endId]));
   profile.points.forEach((point) => {
     if (usedLegacyIds.has(point.id)) return;
-    entities.push(createPoint(vec2(point.x, point.z)));
+    entities.push(createPoint(vec2(point.x, -point.z)));
   });
 
   endpointsByLegacyId.forEach((refs) => {
