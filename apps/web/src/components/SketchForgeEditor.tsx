@@ -5,7 +5,7 @@ import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
-import { LanguageSwitch } from "@/components/editor/LanguageSwitch";
+import { QuickAccessBar } from "@/components/editor/QuickAccessBar";
 import { CommandSearch } from "@/components/editor/CommandSearch";
 import { RIBBON_TABS, type EditorCommand, type RibbonTab } from "@/lib/commandRegistry";
 import { RibbonCommandGroups } from "@/components/editor/RibbonCommandGroups";
@@ -5259,7 +5259,6 @@ export function SketchForgeEditor({
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkplaneWorkspaceSettings>(() => normalizeWorkspaceSettings(initialWorkspace));
   const [snapGrid, setSnapGrid] = useState<GridSize>(() => normalizeSnapGrid(initialSnap));
   const [workplaneMode, setWorkplaneMode] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
   const [stepExporting, setStepExporting] = useState(false);
@@ -5269,7 +5268,6 @@ export function SketchForgeEditor({
   const [alignPreview, setAlignPreview] = useState<{ axis: AlignAxis; target: AlignTarget } | null>(null);
   const [mirrorMode, setMirrorMode] = useState(false);
   const [mirrorPreviewAxis, setMirrorPreviewAxis] = useState<AlignAxis | null>(null);
-  const [activeMode, setActiveMode] = useState("3D Design");
   const [notice, setNotice] = useState("Ready");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const projectFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -8062,7 +8060,6 @@ export function SketchForgeEditor({
   const clearDesign = useCallback(() => {
     commitShapes([], [], "New empty design");
     setClipboard([]);
-    setMenuOpen(false);
     setTopPanel(null);
   }, [commitShapes]);
 
@@ -8071,7 +8068,6 @@ export function SketchForgeEditor({
       const house = makeHouseScene();
       const next = replace ? house : [...shapes, ...house];
       commitShapes(next, house.map((shape) => shape.id), "House scene created");
-      setMenuOpen(false);
       setTopPanel(null);
       return house;
     },
@@ -8082,7 +8078,6 @@ export function SketchForgeEditor({
     (count = 500) => {
       const scene = makeBlockPerfScene(count);
       commitShapes(scene, [], `Performance scene: ${scene.length} blocks`);
-      setMenuOpen(false);
       setTopPanel(null);
       return scene;
     },
@@ -8091,13 +8086,11 @@ export function SketchForgeEditor({
 
   const saveDesign = useCallback(() => {
     setNotice(translatePlural(shapes.length, "notice.savedDesignOne", "notice.savedDesignMany"));
-    setMenuOpen(false);
   }, [shapes.length]);
 
   const makeCopy = useCallback(() => {
     if (shapes.length === 0) {
       setNotice(translate("notice.nothingToCopy"));
-      setMenuOpen(false);
       return;
     }
     const copies = shapes.map((shape) => ({
@@ -8107,7 +8100,6 @@ export function SketchForgeEditor({
       z: Math.min(110, shape.z + 12),
     }));
     commitShapes([...shapes, ...copies], copies.map((shape) => shape.id), "Made a copy of the design");
-    setMenuOpen(false);
   }, [commitShapes, shapes]);
 
   const importFiles = useCallback(async (files: File[]) => {
@@ -8515,7 +8507,6 @@ export function SketchForgeEditor({
         onToolbarModeChange={(mode) => {
           setToolbarMode(mode);
           setTopPanel(null);
-          setMenuOpen(false);
         }}
         canUndo={!projectInteractionActive && (historyIndex > 0 || Boolean(edgeModifier))}
         canRedo={!projectInteractionActive && historyIndex < history.length - 1}
@@ -8565,7 +8556,6 @@ export function SketchForgeEditor({
         onSnap={snapSelected}
         onTips={() => {
           setTopPanel(topPanel === "tips" ? null : "tips");
-          setMenuOpen(false);
         }}
         onToggleHidden={toggleHidden}
         onUngroup={ungroupSelected}
@@ -8574,12 +8564,10 @@ export function SketchForgeEditor({
         workplaneMode={workplaneMode}
         onTopPanel={(panel) => {
           setTopPanel((current) => (current === panel ? null : panel));
-          setMenuOpen(false);
         }}
         onAddShape={(shape) => {
           addShape(shape);
           setTopPanel(null);
-          setMenuOpen(false);
         }}
         onOpenCommandSearch={() => setCommandSearchOpen(true)}
         commands={editorCommands}
@@ -9274,31 +9262,12 @@ function SecondaryToolbar({
         {/* Quick actions belong to the editor, not to a tab: hiding the command
             search or the language switch behind a tab makes them undiscoverable
             exactly when a user is lost. */}
-      <div className="toolbar-section toolbar-actions-section">
-        <div className="toolbar-section-label">{t("section.manage")}</div>
-        <div className="action-buttons">
-          <button className="action-icon-button" aria-label={t("tool.import")} title={t("tool.import")} onClick={() => onTopPanel("import")}>
-            <ToolbarImportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("tool.export")} title={t("tool.export")} onClick={() => onTopPanel("export")}>
-            <ToolbarVectorExportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("tool.workspaceSettings")} title={t("tool.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("sketchforge:open-workspace-settings"))}>
-            <ToolbarSettingsIcon />
-          </button>
-          <button
-            className="command-search-open"
-            data-testid="command-search-open"
-            type="button"
-            aria-label={t("command.searchOpen")}
-            title={t("command.searchOpen")}
-            onClick={onOpenCommandSearch}
-          >
-            {"\u2318K"}
-          </button>
-          <LanguageSwitch />
-        </div>
-      </div>
+        <QuickAccessBar
+          onImport={() => onTopPanel("import")}
+          onExport={() => onTopPanel("export")}
+          onWorkspaceSettings={() => window.dispatchEvent(new Event("sketchforge:open-workspace-settings"))}
+          onOpenCommandSearch={onOpenCommandSearch}
+        />
       </div>
       <div className="toolbar-workspace-tabs" role="tablist" aria-label={t("tab.ariaLabel")}>
         {RIBBON_TABS.map((tab) => (
