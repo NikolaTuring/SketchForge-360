@@ -77,26 +77,19 @@ test("cancels the edge tool without touching the body", async ({ page }) => {
   expect(after.edgeTreatments).toEqual([]);
 });
 
-test("needs Escape twice to close the edge tool", async ({ page }) => {
-  await addShape(page, "box");
+test("closes the edge tool with a single Escape, keeping the selection", async ({ page }) => {
+  const box = await addShape(page, "box");
   await tool(page, "fillet").click();
   await waitForPreparedPanel(page);
 
-  // Recording a known defect, not endorsing it.
-  //
-  // Two window keydown listeners handle Escape. The global one runs first and
-  // clears the selection, which changes the dependencies of the edge tool's own
-  // listener effect; React then tears that listener down *during the same event
-  // dispatch*, and a listener removed mid-dispatch is never called. So the first
-  // Escape only clears the selection and leaves the tool open.
-  //
-  // Phase 2 routes keyboard shortcuts through the command registry and must fix
-  // this. When it does, this test will fail — that is the signal to update it to
-  // expect a single Escape.
-  await page.keyboard.press("Escape");
-  await expect.poll(async () => (await sceneState(page)).selectedIds.length).toBe(0);
-  await expect(page.getByTestId("edge-modifier-panel")).toHaveCount(1);
-
+  // Escape belongs to the modal tool while one is open; it must not fall
+  // through to clearing the selection, which would leave the user with a closed
+  // tool and nothing selected to re-open it on.
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("edge-modifier-panel")).toHaveCount(0);
+  expect((await sceneState(page)).selectedIds).toEqual([box.id]);
+
+  // With no modal tool open, Escape goes back to clearing the selection.
+  await page.keyboard.press("Escape");
+  await expect.poll(async () => (await sceneState(page)).selectedIds.length).toBe(0);
 });

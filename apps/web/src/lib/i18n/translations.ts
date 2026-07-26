@@ -304,6 +304,13 @@ export const TRANSLATIONS = {
   "notice.duplicatedMany": { en: "Duplicated {count} shapes", de: "{count} Körper dupliziert" },
   "notice.pastedOne": { en: "Pasted {count} shape", de: "{count} Körper eingefügt" },
   "notice.pastedMany": { en: "Pasted {count} shapes", de: "{count} Körper eingefügt" },
+
+  // --- Command search -----------------------------------------------------
+  "command.searchTitle": { en: "Find a command", de: "Befehl suchen" },
+  "command.searchPlaceholder": { en: "Type a command…", de: "Befehl eingeben …" },
+  "command.searchEmpty": { en: "No matching command", de: "Kein passender Befehl" },
+  "command.searchOpen": { en: "Find a command (Ctrl+K)", de: "Befehl suchen (Strg+K)" },
+  "tool.separateParts": { en: "Separate parts", de: "Teile auftrennen" },
 } as const satisfies Record<string, { en: string; de: string }>;
 
 export type TranslationKey = keyof typeof TRANSLATIONS;

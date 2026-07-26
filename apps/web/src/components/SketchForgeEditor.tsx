@@ -6,6 +6,8 @@ import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
 import { LanguageSwitch } from "@/components/editor/LanguageSwitch";
+import { CommandSearch } from "@/components/editor/CommandSearch";
+import type { EditorCommand } from "@/lib/commandRegistry";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
 import * as THREE from "three";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
@@ -5257,6 +5259,7 @@ export function SketchForgeEditor({
   const [workplaneMode, setWorkplaneMode] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
+  const [commandSearchOpen, setCommandSearchOpen] = useState(false);
   const [stepExporting, setStepExporting] = useState(false);
   const [skfExporting, setSkfExporting] = useState(false);
   const [alignMode, setAlignMode] = useState(false);
@@ -5645,6 +5648,7 @@ export function SketchForgeEditor({
   const selectedEdgeFeatureCount = useMemo(() => selectedShape ? edgeTreatmentFeatureCount(selectedShape) : 0, [selectedShape]);
   const selectedReversibleEdgeFeatureCount = useMemo(() => selectedShape ? reversibleEdgeTreatmentCount(selectedShape) : 0, [selectedShape]);
   const selectedEdgeHistoryOptions = useMemo(() => selectedShape ? edgeTreatmentHistoryOptions(selectedShape) : [], [selectedShape]);
+  const canEdgeModifySelection = selectedShapes.length === 1 && Boolean(selectedShape && !selectedShape.locked && !selectedShape.hole);
   const canSeparateSelectedParts = useMemo(
     () => selectedShapes.length === 1 && Boolean(selectedShape && separablePartCount(selectedShape) > 1),
     [selectedShape, selectedShapes.length],
@@ -7069,10 +7073,9 @@ export function SketchForgeEditor({
   useEffect(() => {
     if (!edgeModifier) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        cancelEdgeModifier();
-      } else if (event.key === "Enter" && edgeModifier.preview && edgeModifier.selectedEdgeIds.length > 0 && !edgeModifier.busy && !edgeModifier.error) {
+      // Escape is handled by the editor's single global key handler, which knows
+      // the modal tools take precedence over clearing the selection.
+      if (event.key === "Enter" && edgeModifier.preview && edgeModifier.selectedEdgeIds.length > 0 && !edgeModifier.busy && !edgeModifier.error) {
         const target = event.target instanceof HTMLElement ? event.target : null;
         if (target?.closest("input, select, textarea, button, [contenteditable='true']")) return;
         event.preventDefault();
@@ -8263,6 +8266,20 @@ export function SketchForgeEditor({
       const key = event.key.toLowerCase();
       const shortcut = event.ctrlKey || event.metaKey;
 
+      if (shortcut && key === "k") {
+        event.preventDefault();
+        setCommandSearchOpen((open) => !open);
+        return;
+      }
+
+      // The command search owns Escape while it is open; its own input stops the
+      // event, but a keypress with focus elsewhere still has to reach it.
+      if (commandSearchOpen && event.key === "Escape") {
+        event.preventDefault();
+        setCommandSearchOpen(false);
+        return;
+      }
+
       if (sketchActive && toolbarMode === "sketch") {
         if (event.key === "Escape") {
           event.preventDefault();
@@ -8286,6 +8303,14 @@ export function SketchForgeEditor({
       }
 
       if (event.key === "Escape") {
+        // Modal tools come first. This used to live in a second window listener
+        // that React could tear down mid-dispatch — the selection was cleared,
+        // the edge tool stayed open, and it took a second Escape to close it.
+        if (edgeModifier) {
+          event.preventDefault();
+          cancelEdgeModifier();
+          return;
+        }
         setSelectedIds([]);
         setNotice(translate("notice.selectionCleared"));
         return;
@@ -8410,6 +8435,9 @@ export function SketchForgeEditor({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    cancelEdgeModifier,
+    edgeModifier,
+    commandSearchOpen,
     commitShapes,
     clearSketchMeasurement,
     copySelected,
@@ -8438,6 +8466,44 @@ export function SketchForgeEditor({
     toolbarMode,
     undo,
     ungroupSelected,
+  ]);
+
+  // The command registry. Every entry names a command once — its label, where it
+  // belongs in the ribbon, whether it is currently available, and what it does —
+  // so the ribbon, the command search, the context menu and the keyboard cannot
+  // disagree about any of it.
+  const editorCommands = useMemo<EditorCommand[]>(() => [
+    { id: "copy", labelKey: "tool.copy", tab: "solid", groupKey: "section.clipboard", icon: ToolbarCopyIcon, run: copySelected, isEnabled: hasSelection, shortcut: "Ctrl+C" },
+    { id: "paste", labelKey: "tool.paste", tab: "solid", groupKey: "section.clipboard", icon: ToolbarPasteIcon, run: () => void pasteShape(), isEnabled: clipboard.length > 0 || systemClipboardSupported, shortcut: "Ctrl+V" },
+    { id: "duplicate", labelKey: "tool.duplicate", tab: "solid", groupKey: "section.clipboard", icon: ToolbarDuplicateIcon, run: duplicateSelected, isEnabled: hasSelection, shortcut: "Ctrl+D" },
+    { id: "delete", labelKey: "tool.delete", tab: "solid", groupKey: "section.clipboard", icon: ToolbarTrashIcon, run: deleteSelected, isEnabled: hasSelection, shortcut: "Del" },
+    { id: "undo", labelKey: "tool.undo", tab: "solid", groupKey: "section.history", icon: ToolbarUndoIcon, run: undo, isEnabled: !projectInteractionActive && (historyIndex > 0 || Boolean(edgeModifier)), shortcut: "Ctrl+Z" },
+    { id: "redo", labelKey: "tool.redo", tab: "solid", groupKey: "section.history", icon: ToolbarRedoIcon, run: redo, isEnabled: !projectInteractionActive && historyIndex < history.length - 1, shortcut: "Ctrl+Y" },
+    { id: "group", labelKey: "tool.group", tab: "solid", groupKey: "section.combine", icon: ToolbarGroupIcon, run: () => void groupSelected(), isEnabled: selectedShapes.length > 1 && selectedShapes.every((shape) => !shape.locked), shortcut: "Ctrl+G" },
+    { id: "ungroup", labelKey: "tool.ungroup", tab: "solid", groupKey: "section.combine", icon: ToolbarUngroupIcon, run: ungroupSelected, isEnabled: selectedShapes.some((shape) => Boolean(shape.groupedShapes?.length)) },
+    { id: "intersect", labelKey: "tool.intersect", tab: "solid", groupKey: "section.combine", icon: ToolbarIntersectionIcon, run: () => void intersectSelected(), isEnabled: selectedShapes.some((shape) => !shape.locked && !shape.hole) && selectedShapes.some((shape) => !shape.locked && Boolean(shape.hole)) },
+    { id: "align", labelKey: "tool.align", tab: "solid", groupKey: "section.modify", icon: ToolbarAlignIcon, run: toggleAlignMode, isEnabled: selectedShapes.length > 1, isActive: alignMode },
+    { id: "mirror", labelKey: "tool.mirror", tab: "solid", groupKey: "section.modify", icon: ToolbarMirrorIcon, run: toggleMirrorMode, isEnabled: hasSelection, isActive: mirrorMode },
+    { id: "snap", labelKey: "tool.snap", tab: "solid", groupKey: "section.modify", icon: ToolbarSnapGridIcon, run: snapSelected, isEnabled: hasSelection },
+    { id: "chamfer", labelKey: "tool.chamfer", tab: "solid", groupKey: "section.modify", icon: ToolbarChamferIcon, run: () => (edgeModifier?.kind === "chamfer" ? cancelEdgeModifier() : startEdgeModifier("chamfer")), isEnabled: canEdgeModifySelection, isActive: edgeModifier?.kind === "chamfer" },
+    { id: "fillet", labelKey: "tool.fillet", tab: "solid", groupKey: "section.modify", icon: ToolbarFilletIcon, run: () => (edgeModifier?.kind === "fillet" ? cancelEdgeModifier() : startEdgeModifier("fillet")), isEnabled: canEdgeModifySelection, isActive: edgeModifier?.kind === "fillet" },
+    { id: "hide-selected", labelKey: "tool.hideSelected", tab: "solid", groupKey: "section.visibility", icon: ToolbarHideSelectedIcon, run: toggleHidden, isEnabled: hasSelection, shortcut: "Ctrl+H" },
+    { id: "workplane", labelKey: "tool.workplane", tab: "solid", groupKey: "section.arrange", icon: ToolbarWorkplaneIcon, run: activateWorkplaneTool, isEnabled: true, isActive: workplaneMode },
+    { id: "drop-to-workplane", labelKey: "tool.dropToWorkplane", tab: "solid", groupKey: "section.arrange", icon: ToolbarDropToWorkplaneIcon, run: dropSelectedToWorkplane, isEnabled: hasSelection, shortcut: "D" },
+    { id: "separate-parts", labelKey: "tool.separateParts", tab: "mesh", groupKey: "section.modify", run: separateSelectedParts, isEnabled: canSeparateSelectedParts },
+    { id: "sketch-create", labelKey: "sketch.extrudeTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("extrude"), isEnabled: !sketchActive },
+    { id: "sketch-revolve", labelKey: "sketch.revolveTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("revolve"), isEnabled: !sketchActive },
+    { id: "sketch-edit", labelKey: "sketch.edit", tab: "sketch", groupKey: "section.create", run: beginSketchEdit, isEnabled: selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile) },
+    { id: "import", labelKey: "tool.import", tab: "utilities", groupKey: "section.manage", icon: ToolbarImportIcon, run: () => setTopPanel((current) => (current === "import" ? null : "import")), isEnabled: true },
+    { id: "export", labelKey: "tool.export", tab: "utilities", groupKey: "section.manage", icon: ToolbarVectorExportIcon, run: () => setTopPanel((current) => (current === "export" ? null : "export")), isEnabled: true },
+    { id: "workspace-settings", labelKey: "tool.workspaceSettings", tab: "utilities", groupKey: "section.manage", icon: ToolbarSettingsIcon, run: () => window.dispatchEvent(new Event("sketchforge:open-workspace-settings")), isEnabled: true },
+  ], [
+    activateWorkplaneTool, alignMode, beginSketch, beginSketchEdit, canEdgeModifySelection, canSeparateSelectedParts,
+    cancelEdgeModifier, clipboard.length, copySelected, deleteSelected, dropSelectedToWorkplane, duplicateSelected,
+    edgeModifier, groupSelected, hasSelection, history.length, historyIndex, intersectSelected, mirrorMode,
+    pasteShape, projectInteractionActive, redo, selectedShape, selectedShapes, separateSelectedParts, sketchActive,
+    snapSelected, startEdgeModifier, systemClipboardSupported, toggleAlignMode, toggleHidden, toggleMirrorMode,
+    ungroupSelected, undo, workplaneMode,
   ]);
 
   return (
@@ -8513,6 +8579,7 @@ export function SketchForgeEditor({
           setTopPanel(null);
           setMenuOpen(false);
         }}
+        onOpenCommandSearch={() => setCommandSearchOpen(true)}
       />
       <div className="editor-body">
         {toolbarMode === "sketch" && sketchActive ? (
@@ -8698,6 +8765,7 @@ export function SketchForgeEditor({
           event.currentTarget.value = "";
         }}
       />
+      <CommandSearch commands={editorCommands} open={commandSearchOpen} onOpenChange={setCommandSearchOpen} />
       <div className="editor-toast" data-testid="editor-toast" role="status">
         {notice}
       </div>
@@ -8803,6 +8871,7 @@ function SecondaryToolbar({
   workplaneMode,
   onTopPanel,
   onAddShape,
+  onOpenCommandSearch,
 }: {
   toolbarMode: ToolbarMode;
   onToolbarModeChange: (mode: ToolbarMode) => void;
@@ -8854,6 +8923,7 @@ function SecondaryToolbar({
   workplaneMode: boolean;
   onTopPanel: (panel: TopPanel) => void;
   onAddShape: (shape: ShapeAsset) => void;
+  onOpenCommandSearch: () => void;
 }) {
   const { t } = useTranslation();
   const [shapesOpen, setShapesOpen] = useState(false);
@@ -9088,6 +9158,16 @@ function SecondaryToolbar({
           </button>
           <button className="action-icon-button" aria-label={t("tool.workspaceSettings")} title={t("tool.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("sketchforge:open-workspace-settings"))}>
             <ToolbarSettingsIcon />
+          </button>
+          <button
+            className="command-search-open"
+            data-testid="command-search-open"
+            type="button"
+            aria-label={t("command.searchOpen")}
+            title={t("command.searchOpen")}
+            onClick={onOpenCommandSearch}
+          >
+            {"\u2318K"}
           </button>
           <LanguageSwitch />
         </div>
