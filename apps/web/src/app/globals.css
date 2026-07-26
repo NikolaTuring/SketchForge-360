@@ -5678,3 +5678,32 @@ button {
     height: 24px;
   }
 }
+
+/* Language switch — sits in the ribbon's Manage group until the quick-access
+   bar exists. Sized to match the icon buttons beside it. */
+.language-switch select {
+  height: 30px;
+  padding: 0 6px;
+  color: #2c455f;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.language-switch select:hover {
+  border-color: var(--primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
