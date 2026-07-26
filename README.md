@@ -46,6 +46,24 @@ No login. No server project storage. No heavyweight CAD install just to make a u
 - **STL, OBJ, and STEP workflows** - export selected objects or the whole scene, and round-trip exact STEP/B-Rep geometry.
 - **Fast browser stack** - Next.js, React, TypeScript, Three.js, and Manifold/CSG geometry tooling.
 
+### In development
+
+A parametric CAD core is being built alongside the existing editor. These modules
+are complete and tested but not yet reachable from the user interface; nothing in
+the list above changes.
+
+- **Constraint solver** - coincident, horizontal/vertical, parallel,
+  perpendicular, equal, tangent, concentric, midpoint and symmetric constraints,
+  driving dimensions, degrees-of-freedom reporting, and detection of redundant
+  and conflicting constraints. See [docs/SKETCHING.md](docs/SKETCHING.md).
+- **Named parameters** - dimensions driven by expressions such as `bore / 2`,
+  with units, functions and cycle detection.
+- **Exact sketch features** - extrude and revolve through OpenCascade, so a
+  sketch body keeps real analytic faces instead of becoming triangles.
+- **Mesh surface recognition** - recovers planes, cylinders, cones and spheres
+  from an imported STL and regularizes them into clean axes and rounded
+  dimensions. See [docs/MESH_CONVERSION.md](docs/MESH_CONVERSION.md).
+
 ## Demo
 
 ![SketchForge editor demo preview](docs/media/videos/01-create-and-edit-block-preview.gif)
@@ -323,6 +341,10 @@ Please do not open public issues for security-sensitive reports. Read [.github/S
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+SketchForge depends only on permissively licensed open-source components and
+does not read or write any proprietary CAD format. See
+[docs/LEGAL.md](docs/LEGAL.md).
 
 ## SketchForge MCP Skill
 
