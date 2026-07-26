@@ -128,6 +128,7 @@ export const TRANSLATIONS = {
   "notice.pasteCancelled": { en: "Paste cancelled because the project changed", de: "Einfügen abgebrochen, weil sich das Projekt geändert hat" },
   "notice.selectGroupFirst": { en: "Select a group first", de: "Zuerst eine Gruppe auswählen" },
   "notice.selectShapeFirst": { en: "Select a shape first", de: "Zuerst einen Körper auswählen" },
+  "notice.selectionLocked": { en: "The selection is locked — unlock it first", de: "Die Auswahl ist gesperrt – zuerst entsperren" },
   "notice.selectShapeWithEdgeFeature": { en: "Select a shape with an edge feature first", de: "Zuerst einen Körper mit Kantenmerkmal auswählen" },
   "notice.selectSketchEntity": { en: "Select a sketch point or segment to remove it", de: "Skizzenpunkt oder -segment zum Entfernen auswählen" },
   "notice.selectSolidAndHole": { en: "Select at least one solid and one hole for Intersection", de: "Mindestens einen Körper und eine Bohrung für die Schnittmenge auswählen" },
@@ -316,6 +317,36 @@ export const TRANSLATIONS = {
   "tab.inspect": { en: "Inspect", de: "Prüfen" },
   "tab.utilities": { en: "Utilities", de: "Werkzeuge" },
   "ribbon.empty": { en: "Nothing here yet", de: "Hier ist noch nichts" },
+
+  // --- Model browser ------------------------------------------------------
+  // "Ursprung" is the established German term for a document's reference
+  // planes, and "Körper" is what a solid body is called in a German workshop.
+  "browser.title": { en: "Browser", de: "Browser" },
+  "browser.show": { en: "Show browser", de: "Browser einblenden" },
+  "browser.hidePanel": { en: "Hide browser", de: "Browser ausblenden" },
+  "browser.origin": { en: "Origin", de: "Ursprung" },
+  "browser.bodies": { en: "Bodies", de: "Körper" },
+  "browser.noBodies": { en: "No bodies yet", de: "Noch keine Körper" },
+  "browser.plane.xy": { en: "Front (XY)", de: "Vorne (XY)" },
+  "browser.plane.xz": { en: "Top (XZ)", de: "Oben (XZ)" },
+  "browser.plane.yz": { en: "Right (YZ)", de: "Rechts (YZ)" },
+  "browser.showBody": { en: "Show body", de: "Körper einblenden" },
+  "browser.hideBody": { en: "Hide body", de: "Körper ausblenden" },
+  "browser.hiddenByGroup": { en: "Hidden with its group", de: "Mit der Gruppe ausgeblendet" },
+  "browser.lockBody": { en: "Lock body", de: "Körper sperren" },
+  "browser.unlockBody": { en: "Unlock body", de: "Körper entsperren" },
+  "browser.renameBody": { en: "Body name", de: "Körpername" },
+  "browser.expandGroup": { en: "Expand group", de: "Gruppe aufklappen" },
+  "browser.collapseGroup": { en: "Collapse group", de: "Gruppe zuklappen" },
+  "browser.resize": { en: "Resize the browser", de: "Browserbreite ändern" },
+
+  // --- Status bar ---------------------------------------------------------
+  "status.noSelection": { en: "Nothing selected", de: "Nichts ausgewählt" },
+  "status.selection": { en: "{count} selected", de: "{count} ausgewählt" },
+  "status.hidden": { en: "{count} hidden", de: "{count} ausgeblendet" },
+  "status.snap": { en: "Snap {value}", de: "Fang {value}" },
+  "status.snapOff": { en: "off", de: "aus" },
+  "status.unit": { en: "Unit {unit}", de: "Einheit {unit}" },
 } as const satisfies Record<string, { en: string; de: string }>;
 
 export type TranslationKey = keyof typeof TRANSLATIONS;

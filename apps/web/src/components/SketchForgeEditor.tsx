@@ -5,7 +5,10 @@ import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
+import { ModelBrowser } from "@/components/editor/ModelBrowser";
 import { QuickAccessBar } from "@/components/editor/QuickAccessBar";
+import { StatusBar } from "@/components/editor/StatusBar";
+import { useEditorLayout } from "@/lib/editorLayout";
 import { CommandSearch } from "@/components/editor/CommandSearch";
 import { RIBBON_TABS, type EditorCommand, type RibbonTab } from "@/lib/commandRegistry";
 import { RibbonCommandGroups } from "@/components/editor/RibbonCommandGroups";
@@ -5261,6 +5264,9 @@ export function SketchForgeEditor({
   const [workplaneMode, setWorkplaneMode] = useState(false);
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
+  const { t } = useTranslation();
+  const { layout, setLayout } = useEditorLayout();
+  const browserOpen = layout.browserOpen;
   const [stepExporting, setStepExporting] = useState(false);
   const [skfExporting, setSkfExporting] = useState(false);
   const [alignMode, setAlignMode] = useState(false);
@@ -6531,10 +6537,20 @@ export function SketchForgeEditor({
       return;
     }
     const selected = new Set(selectedIds);
+    // A lock has to hold against deletion too. Every other mutation here skips
+    // locked bodies — nudging, hiding, aligning, mirroring — and a lock that
+    // protects a body from being moved but not from being destroyed is worse
+    // than no lock, because it invites people to rely on it.
+    const removed = new Set(shapes.filter((shape) => selected.has(shape.id) && !shape.locked).map((shape) => shape.id));
+    if (removed.size === 0) {
+      setNotice(translate("notice.selectionLocked"));
+      return;
+    }
     commitShapes(
-      shapes.filter((shape) => !selected.has(shape.id)),
-      [],
-      translatePlural(selected.size, "notice.deletedOne", "notice.deletedMany"),
+      shapes.filter((shape) => !removed.has(shape.id)),
+      // The locked bodies are still there, so they stay selected.
+      selectedIds.filter((id) => !removed.has(id)),
+      translatePlural(removed.size, "notice.deletedOne", "notice.deletedMany"),
     );
   }, [commitShapes, hasSelection, selectedIds, shapes]);
 
@@ -8572,7 +8588,30 @@ export function SketchForgeEditor({
         onOpenCommandSearch={() => setCommandSearchOpen(true)}
         commands={editorCommands}
       />
-      <div className="editor-body">
+      <div className={`editor-body ${browserOpen ? "with-browser" : ""}`}>
+        {browserOpen ? (
+          <ModelBrowser
+            shapes={shapes}
+            selectedIds={selectedIds}
+            documentName={projectName}
+            width={layout.browserWidth}
+            onSelect={selectShape}
+            onUpdateShape={updateShape}
+            onWidthChange={(width) => setLayout({ browserWidth: width })}
+            onClose={() => setLayout({ browserOpen: false })}
+          />
+        ) : (
+          <button
+            className="browser-reveal"
+            data-testid="browser-reveal"
+            type="button"
+            aria-label={t("browser.show")}
+            title={t("browser.show")}
+            onClick={() => setLayout({ browserOpen: true })}
+          >
+            {"›"}
+          </button>
+        )}
         {toolbarMode === "sketch" && sketchActive ? (
           <SketchWorkspace
             profile={sketchProfile}
@@ -8757,9 +8796,19 @@ export function SketchForgeEditor({
         }}
       />
       <CommandSearch commands={editorCommands} open={commandSearchOpen} onOpenChange={setCommandSearchOpen} />
-      <div className="editor-toast" data-testid="editor-toast" role="status">
-        {notice}
-      </div>
+      {/*
+        The notice used to float over the model as a toast. It now lives in the
+        status bar instead: a message that overlaps the thing it is commenting
+        on is in the way exactly when it matters, and a status bar is where
+        someone looks for "what just happened" without being interrupted.
+      */}
+      <StatusBar
+        shapes={shapes}
+        selectedShapes={selectedShapes}
+        workspace={workspaceSettings}
+        snapGrid={snapGrid}
+        notice={notice}
+      />
       <pre data-codex-state hidden>
         {debugState}
       </pre>

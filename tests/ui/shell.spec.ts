@@ -23,18 +23,21 @@ test.beforeEach(async ({ page }) => {
   await openEditor(page);
 });
 
-test("the ribbon and the body tile the window exactly", async ({ page }) => {
+test("the three rows tile the window exactly", async ({ page }) => {
   const viewport = page.viewportSize();
   if (!viewport) throw new Error("The page has no viewport size");
 
   const ribbon = await box(page, ".secondary-toolbar");
   const body = await box(page, ".editor-body");
+  const status = await box(page, "[data-testid='status-bar']");
 
   expect(ribbon.y).toBeCloseTo(0, 0);
-  // The seam: the body starts where the ribbon ends. A gap shows the page
-  // background, an overlap hides the top of the viewport behind the ribbon.
+  // The seams: each row starts where the one above it ends. A gap shows the
+  // page background, an overlap hides the top of the viewport behind the
+  // ribbon or its bottom behind the status bar.
   expect(body.y).toBeCloseTo(ribbon.y + ribbon.height, 0);
-  expect(body.y + body.height).toBeCloseTo(viewport.height, 0);
+  expect(status.y).toBeCloseTo(body.y + body.height, 0);
+  expect(status.y + status.height).toBeCloseTo(viewport.height, 0);
   expect(body.width).toBeCloseTo(viewport.width, 0);
 });
 
@@ -48,18 +51,30 @@ test("the window itself never scrolls", async ({ page }) => {
   expect(overflow.horizontal).toBeLessThanOrEqual(0);
 });
 
-test("the viewport fills the body", async ({ page }) => {
+test("the browser and the viewport fill the body between them", async ({ page }) => {
   const body = await box(page, ".editor-body");
   const stage = await box(page, ".workplane-stage");
+  const browser = await box(page, "[data-testid='model-browser']");
 
+  expect(browser.height).toBeCloseTo(body.height, 0);
   expect(stage.height).toBeCloseTo(body.height, 0);
-  expect(stage.width).toBeCloseTo(body.width, 0);
+  expect(browser.width + stage.width).toBeCloseTo(body.width, 0);
 
   // The canvas has to follow the stage, not just sit inside it: a canvas that
   // keeps its old size renders the scene at the wrong aspect ratio.
   const canvas = await box(page, ".workplane-stage canvas");
   expect(canvas.height).toBeCloseTo(stage.height, 0);
   expect(canvas.width).toBeCloseTo(stage.width, 0);
+});
+
+test("closing the browser gives its column to the viewport", async ({ page }) => {
+  const before = (await box(page, ".workplane-stage")).width;
+  await page.getByTestId("browser-close").click();
+
+  const body = await box(page, ".editor-body");
+  const stage = await box(page, ".workplane-stage");
+  expect(stage.width).toBeGreaterThan(before);
+  expect(stage.width).toBeCloseTo(body.width, 0);
 });
 
 test("floating panels stay clear of the ribbon", async ({ page }) => {
@@ -81,7 +96,13 @@ test("the shell still tiles the window when the ribbon grows on a narrow window"
 
   const ribbon = await box(page, ".secondary-toolbar");
   const body = await box(page, ".editor-body");
+  const status = await box(page, "[data-testid='status-bar']");
 
   expect(body.y).toBeCloseTo(ribbon.y + ribbon.height, 0);
-  expect(body.y + body.height).toBeCloseTo(700, 0);
+  expect(status.y + status.height).toBeCloseTo(700, 0);
+
+  // Under the overlay breakpoint the browser floats over the model instead of
+  // taking a column, so the viewport keeps the full width.
+  const stage = await box(page, ".workplane-stage");
+  expect(stage.width).toBeCloseTo(900, 0);
 });

@@ -29,7 +29,9 @@ export type DebugShape = {
   importedTriangles: number;
   edgeTreatments: { kind: string; amount: number; edgeCount: number }[];
   cadDisplayEdgeCount: number | null;
-  groupedShapes?: number;
+  /** How many bodies a group contains; 0 for a plain body. */
+  groupedCount: number;
+  children: DebugShape[];
 };
 
 export type DebugState = {

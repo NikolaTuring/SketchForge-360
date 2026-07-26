@@ -20,6 +20,7 @@
   --shadow: 0 2px 6px rgba(35, 55, 75, 0.12);
   --font-ui: "Avenir Next", Avenir, "Helvetica Neue", Arial, sans-serif;
   --editor-toolbar-height: 108px;
+  --editor-status-height: 26px;
   --editor-toolbar-tools-height: 76px;
 }
 
@@ -961,7 +962,7 @@ button {
 .sketchforge-editor {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   width: 100vw;
   height: 100vh;
   min-width: 320px;
@@ -5717,4 +5718,327 @@ button {
 .ribbon-empty {
   color: var(--muted-strong);
   font-size: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Docks: the model browser, and the status bar along the bottom.
+ * ------------------------------------------------------------------------ */
+
+.model-browser {
+  position: relative;
+  z-index: 12;
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #f7f9fb;
+  border-right: 1px solid #d2dce5;
+}
+
+.browser-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  color: #46617b;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: #eef3f7;
+  border-bottom: 1px solid #dbe4ec;
+}
+
+.browser-header-button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: #5c7590;
+  font-size: 16px;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.browser-header-button:hover {
+  background: #dde7ef;
+}
+
+.browser-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 6px 0 10px;
+  overflow: auto;
+}
+
+.browser-document {
+  padding: 4px 10px 6px;
+  color: #2b465e;
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.browser-folder {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  color: #3c5670;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.browser-folder:hover {
+  background: #e8f1f7;
+}
+
+.browser-count {
+  margin-left: auto;
+  padding: 0 5px;
+  color: #6a8098;
+  font-size: 10px;
+  font-weight: 800;
+  background: #e3ebf2;
+  border-radius: 8px;
+}
+
+.browser-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.browser-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding-right: 4px;
+}
+
+.browser-row:hover {
+  background: #e8f1f7;
+}
+
+.browser-row.selected {
+  background: #d6e9f7;
+}
+
+/* A hidden body stays listed and stays operable — dimmed, not removed. Taking
+ * it out of the tree is what makes hidden geometry impossible to find again. */
+.browser-row.hidden-body .browser-name,
+.browser-row.hidden-body .browser-kind {
+  opacity: 0.45;
+}
+
+.browser-twisty {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  color: #5c7590;
+  background: transparent;
+  cursor: pointer;
+}
+
+.browser-twisty.placeholder {
+  cursor: default;
+}
+
+.browser-kind {
+  display: grid;
+  width: 20px;
+  height: 15px;
+  flex: 0 0 20px;
+  place-items: center;
+  color: #4d6a86;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  background: #e3ebf2;
+  border-radius: 2px;
+}
+
+.browser-name {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  color: #26405a;
+  font-size: 12px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  background: transparent;
+  cursor: pointer;
+}
+
+.browser-name.static {
+  cursor: default;
+}
+
+.browser-rename {
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  padding: 0 4px;
+  color: #26405a;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid #7fb2d8;
+  border-radius: 2px;
+}
+
+.browser-toggle {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  place-items: center;
+  color: #5c7590;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.browser-toggle:hover:not(:disabled) {
+  background: #d3e2ee;
+}
+
+.browser-toggle:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.browser-toggle.off {
+  color: #93a7ba;
+}
+
+.browser-toggle.on {
+  color: #1f6fa8;
+}
+
+.browser-empty {
+  margin: 2px 0 0;
+  padding: 4px 10px 4px 24px;
+  color: #7c90a4;
+  font-size: 12px;
+}
+
+/* The drag grip sits on the dock's edge and is wider than the border it
+ * straddles, because a one-pixel target is not a target. */
+.browser-resize {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  z-index: 13;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.browser-resize:hover,
+.browser-resize:focus-visible {
+  background: rgba(31, 111, 168, 0.35);
+  outline: none;
+}
+
+/* The tab that brings a dismissed browser back. Without it, closing the dock
+ * would be one-way. */
+.browser-reveal {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  z-index: 12;
+  width: 16px;
+  height: 34px;
+  color: #4d6a86;
+  font-size: 13px;
+  font-weight: 800;
+  background: #eef3f7;
+  border: 1px solid #d2dce5;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+}
+
+.browser-reveal:hover {
+  background: #dde7ef;
+}
+
+.editor-status-bar {
+  display: flex;
+  z-index: 15;
+  align-items: center;
+  gap: 14px;
+  height: var(--editor-status-height);
+  padding: 0 12px;
+  color: #4a6480;
+  font-size: 11px;
+  font-weight: 600;
+  background: #eef3f7;
+  border-top: 1px solid #d2dce5;
+}
+
+.status-notice {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-spacer {
+  flex: 1;
+}
+
+.status-field {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.status-unit {
+  color: #2b465e;
+  font-weight: 800;
+}
+
+/*
+ * Narrow windows: the browser stops taking a column and floats over the model.
+ * Below this width a dock plus the viewport leaves neither of them usable, and
+ * the model is the one that has to win.
+ */
+@media (max-width: 1100px) {
+  .model-browser {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    box-shadow: 0 0 24px rgba(28, 48, 68, 0.22);
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-status-bar {
+    gap: 8px;
+    padding: 0 8px;
+  }
+
+  /* On a phone-sized window the numbers are the first thing to go: the notice
+   * is the only field that says what just happened. */
+  .status-field:not(.status-unit) {
+    display: none;
+  }
 }
