@@ -7,7 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
 import { LanguageSwitch } from "@/components/editor/LanguageSwitch";
 import { CommandSearch } from "@/components/editor/CommandSearch";
-import type { EditorCommand } from "@/lib/commandRegistry";
+import { RIBBON_TABS, type EditorCommand, type RibbonTab } from "@/lib/commandRegistry";
+import { RibbonCommandGroups } from "@/components/editor/RibbonCommandGroups";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
 import * as THREE from "three";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
@@ -110,7 +111,8 @@ type ExportFormat = "stl" | "obj" | "step" | "svg" | "skf";
 type DirectExportFormat = Exclude<ExportFormat, "step" | "skf">;
 type SkfHistoryLimit = EditorHistoryExportLimit;
 type SkfExportTarget = "download" | "shared";
-type ToolbarMode = "geometry" | "sketch";
+// The ribbon's tabs. "solid" was called "geometry" while there were only two.
+type ToolbarMode = RibbonTab;
 type Vec3 = [number, number, number];
 type MeshData = { name: string; vertices: Vec3[]; faces: [number, number, number][] };
 type Cuboid = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
@@ -5293,7 +5295,7 @@ export function SketchForgeEditor({
   const interactionHistoryChangedRef = useRef(false);
   const interactionHistoryTimerRef = useRef<number | null>(null);
   const [projectInteractionActive, setProjectInteractionActive] = useState(false);
-  const [toolbarMode, setToolbarMode] = useState<ToolbarMode>("geometry");
+  const [toolbarMode, setToolbarMode] = useState<ToolbarMode>("solid");
   const [sketchActive, setSketchActive] = useState(false);
   const [sketchOperation, setSketchOperation] = useState<SketchOperation>("extrude");
   const [sketchRevolveSettings, setSketchRevolveSettings] = useState<SketchRevolveSettings>(() => ({ ...DEFAULT_SKETCH_REVOLVE_SETTINGS }));
@@ -6336,7 +6338,7 @@ export function SketchForgeEditor({
     setSketchActive(false);
     setSketchRevolvePreview(null);
     setEditingSketchShapeId(null);
-    setToolbarMode("geometry");
+    setToolbarMode("solid");
   }, [commitShapes, editingSketchShapeId, shapes, sketchOperation, sketchProfile, sketchRevolveSettings]);
 
   useEffect(() => {
@@ -8580,6 +8582,7 @@ export function SketchForgeEditor({
           setMenuOpen(false);
         }}
         onOpenCommandSearch={() => setCommandSearchOpen(true)}
+        commands={editorCommands}
       />
       <div className="editor-body">
         {toolbarMode === "sketch" && sketchActive ? (
@@ -8872,6 +8875,7 @@ function SecondaryToolbar({
   onTopPanel,
   onAddShape,
   onOpenCommandSearch,
+  commands,
 }: {
   toolbarMode: ToolbarMode;
   onToolbarModeChange: (mode: ToolbarMode) => void;
@@ -8924,6 +8928,7 @@ function SecondaryToolbar({
   onTopPanel: (panel: TopPanel) => void;
   onAddShape: (shape: ShapeAsset) => void;
   onOpenCommandSearch: () => void;
+  commands: readonly EditorCommand[];
 }) {
   const { t } = useTranslation();
   const [shapesOpen, setShapesOpen] = useState(false);
@@ -8931,7 +8936,7 @@ function SecondaryToolbar({
   const sketchCreateMenuRef = useRef<HTMLDivElement>(null);
   const touchShapeStartRef = useRef<{ id: string; x: number; y: number } | null>(null);
   const suppressNextShapeClickRef = useRef(false);
-  const selectToolbarMode = (mode: "geometry" | "sketch") => {
+  const selectToolbarMode = (mode: RibbonTab) => {
     setShapesOpen(false);
     setSketchCreateOpen(false);
     onTopPanel(null);
@@ -9019,7 +9024,7 @@ function SecondaryToolbar({
   return (
     <div className="secondary-toolbar">
       <div className={`toolbar-mode-content ${toolbarMode}`}>
-        {toolbarMode === "geometry" ? (
+        {toolbarMode === "solid" ? (
           <>
       {onHome ? (
         <div className="tool-group editor-nav-group">
@@ -9147,33 +9152,8 @@ function SecondaryToolbar({
           <div className="toolbar-section-tools">{arrangeTools.map(renderToolButton)}</div>
         </div>
       </div>
-      <div className="toolbar-section toolbar-actions-section">
-        <div className="toolbar-section-label">{t("section.manage")}</div>
-        <div className="action-buttons">
-          <button className="action-icon-button" aria-label={t("tool.import")} title={t("tool.import")} onClick={() => onTopPanel("import")}>
-            <ToolbarImportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("tool.export")} title={t("tool.export")} onClick={() => onTopPanel("export")}>
-            <ToolbarVectorExportIcon />
-          </button>
-          <button className="action-icon-button" aria-label={t("tool.workspaceSettings")} title={t("tool.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("sketchforge:open-workspace-settings"))}>
-            <ToolbarSettingsIcon />
-          </button>
-          <button
-            className="command-search-open"
-            data-testid="command-search-open"
-            type="button"
-            aria-label={t("command.searchOpen")}
-            title={t("command.searchOpen")}
-            onClick={onOpenCommandSearch}
-          >
-            {"\u2318K"}
-          </button>
-          <LanguageSwitch />
-        </div>
-      </div>
           </>
-        ) : (
+        ) : toolbarMode === "sketch" ? (
           <div className="sketch-toolbar-ribbon" aria-label={t("sketch.toolbar")}>
             {sketchActive ? (
               <>
@@ -9288,29 +9268,52 @@ function SecondaryToolbar({
               </div>
             )}
           </div>
+        ) : (
+          <RibbonCommandGroups commands={commands} tab={toolbarMode} />
         )}
+        {/* Quick actions belong to the editor, not to a tab: hiding the command
+            search or the language switch behind a tab makes them undiscoverable
+            exactly when a user is lost. */}
+      <div className="toolbar-section toolbar-actions-section">
+        <div className="toolbar-section-label">{t("section.manage")}</div>
+        <div className="action-buttons">
+          <button className="action-icon-button" aria-label={t("tool.import")} title={t("tool.import")} onClick={() => onTopPanel("import")}>
+            <ToolbarImportIcon />
+          </button>
+          <button className="action-icon-button" aria-label={t("tool.export")} title={t("tool.export")} onClick={() => onTopPanel("export")}>
+            <ToolbarVectorExportIcon />
+          </button>
+          <button className="action-icon-button" aria-label={t("tool.workspaceSettings")} title={t("tool.workspaceSettings")} onClick={() => window.dispatchEvent(new Event("sketchforge:open-workspace-settings"))}>
+            <ToolbarSettingsIcon />
+          </button>
+          <button
+            className="command-search-open"
+            data-testid="command-search-open"
+            type="button"
+            aria-label={t("command.searchOpen")}
+            title={t("command.searchOpen")}
+            onClick={onOpenCommandSearch}
+          >
+            {"\u2318K"}
+          </button>
+          <LanguageSwitch />
+        </div>
+      </div>
       </div>
       <div className="toolbar-workspace-tabs" role="tablist" aria-label={t("tab.ariaLabel")}>
-        <button
-          className={toolbarMode === "geometry" ? "active" : ""}
-          data-testid="tab-geometry"
-          type="button"
-          role="tab"
-          aria-selected={toolbarMode === "geometry"}
-          onClick={() => selectToolbarMode("geometry")}
-        >
-          {t("tab.geometry")}
-        </button>
-        <button
-          className={toolbarMode === "sketch" ? "active" : ""}
-          data-testid="tab-sketch"
-          type="button"
-          role="tab"
-          aria-selected={toolbarMode === "sketch"}
-          onClick={() => selectToolbarMode("sketch")}
-        >
-          {t("tab.sketch")}
-        </button>
+        {RIBBON_TABS.map((tab) => (
+          <button
+            key={tab}
+            className={toolbarMode === tab ? "active" : ""}
+            data-testid={`tab-${tab}`}
+            type="button"
+            role="tab"
+            aria-selected={toolbarMode === tab}
+            onClick={() => selectToolbarMode(tab)}
+          >
+            {t(`tab.${tab}`)}
+          </button>
+        ))}
       </div>
     </div>
   );

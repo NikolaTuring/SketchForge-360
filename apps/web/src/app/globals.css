@@ -5816,3 +5816,17 @@ button {
   color: var(--foreground);
   border-color: var(--primary);
 }
+
+/* A registry-driven ribbon group can hold a command with no icon yet. */
+.toolbar-text-command {
+  padding: 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.ribbon-empty {
+  color: var(--muted-strong);
+  font-size: 12px;
+}

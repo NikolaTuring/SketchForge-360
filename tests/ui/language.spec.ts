@@ -18,11 +18,11 @@ async function switchTo(page: import("@playwright/test").Page, language: "de" | 
 
 test("translates the ribbon", async ({ page }) => {
   await expect(tool(page, "delete")).toHaveAttribute("aria-label", "Delete");
-  await expect(page.getByTestId("tab-geometry")).toHaveText("Geometry");
+  await expect(page.getByTestId("tab-solid")).toHaveText("Solid");
 
   await switchTo(page, "de");
   await expect(tool(page, "delete")).toHaveAttribute("aria-label", "Löschen");
-  await expect(page.getByTestId("tab-geometry")).toHaveText("Geometrie");
+  await expect(page.getByTestId("tab-solid")).toHaveText("Volumen");
 
   await switchTo(page, "en");
   await expect(tool(page, "delete")).toHaveAttribute("aria-label", "Delete");
@@ -52,7 +52,7 @@ test("remembers the choice across a reload", async ({ page }) => {
   await page.reload();
 
   await expect(page.getByTestId("language-switch")).toHaveValue("de");
-  await expect(page.getByTestId("tab-geometry")).toHaveText("Geometrie");
+  await expect(page.getByTestId("tab-solid")).toHaveText("Volumen");
 });
 
 test("leaves the model untouched when the language changes", async ({ page }) => {

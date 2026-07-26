@@ -311,6 +311,11 @@ export const TRANSLATIONS = {
   "command.searchEmpty": { en: "No matching command", de: "Kein passender Befehl" },
   "command.searchOpen": { en: "Find a command (Ctrl+K)", de: "Befehl suchen (Strg+K)" },
   "tool.separateParts": { en: "Separate parts", de: "Teile auftrennen" },
+  "tab.solid": { en: "Solid", de: "Volumen" },
+  "tab.mesh": { en: "Mesh", de: "Netz" },
+  "tab.inspect": { en: "Inspect", de: "Prüfen" },
+  "tab.utilities": { en: "Utilities", de: "Werkzeuge" },
+  "ribbon.empty": { en: "Nothing here yet", de: "Hier ist noch nichts" },
 } as const satisfies Record<string, { en: string; de: string }>;
 
 export type TranslationKey = keyof typeof TRANSLATIONS;

@@ -70,7 +70,7 @@ test("returns to the geometry tab after finishing", async ({ page }) => {
   await page.getByTestId("sketch-finish").click();
   await expectShapeCount(page, 1);
 
-  await expect(page.getByTestId("tab-geometry")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("tab-solid")).toHaveAttribute("aria-selected", "true");
 });
 
 test("undoes an extruded sketch body", async ({ page }) => {
