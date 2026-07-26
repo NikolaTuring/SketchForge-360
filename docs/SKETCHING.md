@@ -3,9 +3,12 @@
 This describes the parametric sketching core: the data model, the constraint
 solver, the profile finder and the B-Rep feature builders.
 
-> **Status.** These modules are complete and tested, but they are not yet wired
-> into the editor. The existing freehand sketch mode is unchanged and continues
-> to work. See "What is not built yet" at the end.
+> **Status.** The sketcher is in the editor: Sketch tab → *Parametric sketch*.
+> Pick a plane, draw, constrain, dimension, extrude. Sketches are stored with the
+> body they built and can be reopened and rebuilt. The existing freehand sketch
+> mode is unchanged and continues to work alongside it — projects drawn with it
+> reopen exactly as before. See "What is not built yet" at the end for what is
+> still missing.
 
 ## Why a solver at all
 
@@ -148,10 +151,78 @@ The solver's most valuable test compares every residual's analytic derivative
 against a central finite difference. A wrong Jacobian still converges sometimes,
 which makes that class of bug very hard to spot from behaviour alone.
 
+## The user interface — `components/sketch/`
+
+`SketchPlanePicker` chooses one of the three base planes plus an offset. The
+offset is what makes a base plane useful past the first feature: a boss on top of
+a 10 mm plate is a sketch on the ground plane offset by 10, and without it every
+such sketch would need a construction body first.
+
+`ParametricSketchEditor` is the canvas. Sketch units *are* SVG units and pan and
+zoom live in the `viewBox`, so a 25 mm line is 25 units of markup — nothing has
+to be un-transformed to read a coordinate back, which is also what lets a browser
+test click a sketch millimetre and mean it.
+
+`lib/sketchSession.ts` holds the drawing state machine, deliberately outside the
+component. "What does the next click do" is the part of a sketcher people feel,
+and it is far easier to get right with tests than by clicking. Each tool is a
+table entry naming how many points it needs and what it builds, so adding one is
+not another branch in a pointer handler.
+
+Three behaviours there are worth knowing:
+
+- A misclick costs one click, not the whole shape. A degenerate result drops the
+  last point and keeps the rest.
+- The line tool chains, and each new segment gets a real coincidence to the one
+  before it. Without that the chain looks connected and comes apart the moment
+  anything is dragged, and region detection then finds no closed loop at all.
+- Degenerate geometry is refused rather than created. A zero-length entity is
+  invisible on screen and breaks region detection later, with an error pointing
+  nowhere near the click that caused it.
+
+Tool options are a row of fields rather than a prompt per click. Trimming twenty
+corners through a modal dialog is not a workflow, and a prompt cannot be reached
+from the keyboard at all.
+
+The sketch is re-solved after every change. That is affordable because the solver
+works on the entities alone, and it is the only way the degree-of-freedom count
+can be true — a stale answer there is worse than none.
+
+## Editing geometry — `lib/sketchEditing.ts`
+
+Trim, extend, offset, 2D fillet, mirror, and rectangular and circular patterns.
+All analytic: trimming a line at a circle produces a shorter line, not a polyline
+that stops near it.
+
+The awkward cases are the ones that matter. A tangent line touches a circle once,
+not twice — the double root would make trim cut a zero-length piece. One cut
+cannot open a circle, so trimming one needs two crossings. A fillet radius that
+does not fit is refused rather than quietly reduced. Mirroring reverses
+handedness, so an arc is rebuilt with its endpoints swapped rather than its angles
+negated; that is what keeps it on the same side of its chord.
+
+## Persistence
+
+A body carries the sketch that built it, and `.skf` stores it (format version 2).
+The addition is optional, so `SKF_MINIMUM_READER_VERSION` stays at 1: v1 files
+open unchanged here, and v2 files still open in older builds, which simply do not
+see the sketch.
+
+A stored sketch is validated rather than trusted. A `.skf` can come from anywhere
+and its sketch goes straight to the solver and then to the CAD kernel; the entity
+and constraint counts are bounded for the same reason, since a file claiming a
+million entities would freeze the tab before any error could be shown.
+
 ## What is not built yet
 
-- The sketch user interface: plane picker, drawing tools, constraint palette,
-  dimension input, automatic constraint inference while drawing.
-- The feature timeline that re-executes features when a dimension changes.
-- Persistence of sketches and features in `.skf`.
+- Starting a sketch on a face of an existing body. The kernel side is done —
+  `listPlanarFaces` returns each planar face with an outward normal — but the
+  viewport does not yet pick faces.
+- A feature timeline: a body remembers one sketch and rebuilds from it, but there
+  is no ordered list of features to reorder, suppress or roll back.
+- Named parameters shared across sketches. Dimensions accept expressions with
+  units and arithmetic (`1cm + 5`), but not yet references to a project-wide
+  parameter table.
+- Automatic constraint inference while drawing, with snap glyphs.
+- Dragging geometry to re-solve interactively.
 - Sweep and loft, though the kernel supports both.

@@ -5,9 +5,10 @@ a cylindrical hole is a ring of narrow flat strips, and there is no radius
 anywhere in the file to read. This pipeline recovers the planes, cylinders, cones
 and spheres the part was originally made of.
 
-> **Status.** Recognition and regularization are complete and tested. Rebuilding
-> a solid from the recognised surfaces, and the user interface for it, are not
-> built yet. See "What is not built yet".
+> **Status.** Recognition, regularization and the panel that reports them are in
+> the editor: select an imported body, Mesh tab → *Recognise surfaces*. Rebuilding
+> an OpenCascade solid from the recognised surfaces is not built yet. See "What is
+> not built yet".
 
 ## The pipeline — `lib/meshToBrep/`
 
@@ -110,6 +111,33 @@ The tolerance is how far a triangle may sit from the surface it is assigned to.
 - **Scanned or organic meshes** will not reconstruct into analytic surfaces, and
   should not. The coverage figure will be low, which is the honest answer.
 
+## The panel — `components/workplane/MeshConvertPanel.tsx`
+
+An STL from a scanner and one from a CAD program look identical in the viewport,
+and only one of them can be turned back into clean geometry. The panel says
+which: the surface tally, the fraction of area accounted for, the triangles left
+over, and the verdict.
+
+The verdict comes first because it is the one thing worth knowing before spending
+time on tolerances — a mesh that is not closed cannot become a solid however well
+its surfaces were recognised. It names the open and non-manifold edge counts that
+make it so.
+
+The tolerances are exposed rather than fixed. A scanned part needs a looser angle
+tolerance than a tessellated one, and burying that choice would make "it did not
+work" the only available diagnosis. Changing one clears the result on screen: old
+numbers beside new settings is how someone ends up trusting an answer that was
+never produced.
+
+### Indexed and non-indexed meshes
+
+`buildMeshTopology` takes optional indices, because the two sources genuinely
+differ. An imported STL is a triangle soup — three vertices per triangle, no
+sharing. The CAD kernel's own tessellation is indexed. Reading an indexed mesh as
+a soup is not a rounding error: a box comes out as eight triangles with fourteen
+boundary edges, so a perfectly closed solid reports as an open shell and every
+later stage rejects it.
+
 ## What is not built yet
 
 - Extracting the boundary curves between recognised surfaces and fitting them to
@@ -118,5 +146,5 @@ The tolerance is how far a triangle may sit from the surface it is assigned to.
   analytic faces first; then sew plus coplanar-facet merging, which makes flat
   areas exact while curved ones stay faceted; then keeping the mesh with a report
   of which regions failed.
-- The conversion panel, its live preview and its tolerance controls.
+- A live preview that colours the viewport body by recognised surface type.
 - Torus recognition.

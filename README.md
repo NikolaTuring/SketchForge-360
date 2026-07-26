@@ -44,25 +44,26 @@ No login. No server project storage. No heavyweight CAD install just to make a u
 - **Rotated solid edge treatment** - chamfer and fillet preserve analytic box topology after one-, two-, or three-axis rotations.
 - **STL import** - bring outside models into the same workspace as primitives.
 - **STL, OBJ, and STEP workflows** - export selected objects or the whole scene, and round-trip exact STEP/B-Rep geometry.
-- **Fast browser stack** - Next.js, React, TypeScript, Three.js, and Manifold/CSG geometry tooling.
-
-### In development
-
-A parametric CAD core is being built alongside the existing editor. These modules
-are complete and tested but not yet reachable from the user interface; nothing in
-the list above changes.
-
-- **Constraint solver** - coincident, horizontal/vertical, parallel,
-  perpendicular, equal, tangent, concentric, midpoint and symmetric constraints,
-  driving dimensions, degrees-of-freedom reporting, and detection of redundant
-  and conflicting constraints. See [docs/SKETCHING.md](docs/SKETCHING.md).
-- **Named parameters** - dimensions driven by expressions such as `bore / 2`,
-  with units, functions and cycle detection.
-- **Exact sketch features** - extrude and revolve through OpenCascade, so a
-  sketch body keeps real analytic faces instead of becoming triangles.
+- **Parametric sketching** - pick a plane, draw with lines, rectangles, circles,
+  arcs, polygons and slots, then trim, extend, offset, fillet, mirror and pattern
+  the result. A constraint solver reports degrees of freedom and flags redundant
+  and conflicting relations. See [docs/SKETCHING.md](docs/SKETCHING.md).
+- **Dimensions that drive geometry** - typed as expressions with units and
+  arithmetic (`1cm + 5`), re-solved as you type.
+- **Exact sketch bodies** - extruded through OpenCascade, so a sketch body keeps
+  real analytic faces instead of becoming triangles, and exports to STEP as the
+  geometry it was built from. Sketches are stored with the body and can be
+  reopened and rebuilt at a different size.
 - **Mesh surface recognition** - recovers planes, cylinders, cones and spheres
-  from an imported STL and regularizes them into clean axes and rounded
-  dimensions. See [docs/MESH_CONVERSION.md](docs/MESH_CONVERSION.md).
+  from an imported STL, regularizes them into clean axes and rounded dimensions,
+  and reports honestly what it could not account for. See
+  [docs/MESH_CONVERSION.md](docs/MESH_CONVERSION.md).
+- **Model browser and status bar** - a tree of what the document contains,
+  including hidden and locked bodies, and a permanent statement of the unit every
+  number is in.
+- **Bilingual interface** - German and English, switchable at any time.
+- **Command search** - Ctrl+K reaches every command by name, in either language.
+- **Fast browser stack** - Next.js, React, TypeScript, Three.js, and Manifold/CSG geometry tooling.
 
 ## Demo
 

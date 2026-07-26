@@ -59,7 +59,27 @@ Current safety limits are 512 MB compressed, 1 GB expanded, 256 MB per asset, 32
 
 ## Compatibility and migrations
 
-The current format is version 1. Readers refuse a higher `formatVersion` or `minimumReaderVersion` instead of partially loading it. The importer also contains an explicit migration for the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+The current format is version 2. Readers refuse a higher `formatVersion` or `minimumReaderVersion` instead of partially loading it. The importer also contains an explicit migration for the documented version 0 pure-JSON prototype and preserves its object IDs and valid history.
+
+### Version 2 — parametric sketches
+
+Version 2 adds one optional field to a shape definition, `parametricSketch`,
+holding the sketch a body was built from and the distance it was extruded by. It
+is what makes a sketch body editable rather than a one-way result.
+
+`minimumReaderVersion` deliberately stays at **1**. The addition is purely
+additive, so a version 1 file opens in a version 2 reader unchanged, and a
+version 2 file still opens in an older build — which simply does not see the
+sketch and treats the body as an ordinary imported mesh. Raising the minimum
+would have locked every project written from that point out of every release
+before it, to protect one optional field. There is no migration, because there is
+nothing to migrate.
+
+The stored sketch is validated rather than trusted: a `.skf` can come from
+anywhere and its sketch is fed straight to the constraint solver and then to the
+CAD kernel. Entity and constraint counts are bounded (20 000 each) for the same
+reason — a file claiming a million entities would freeze the tab before any error
+could be shown.
 
 Future schema changes should add a version-to-version migration, run validation after every migration, and never mutate the user's original file.
 
