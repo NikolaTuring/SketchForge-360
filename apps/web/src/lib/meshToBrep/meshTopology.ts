@@ -8,6 +8,16 @@
 
 export type Vec3 = { x: number; y: number; z: number };
 
+/**
+ * Interleaved XYZ vertex coordinates.
+ *
+ * `ArrayLike` rather than `number[]` so the typed array a worker or the CAD
+ * kernel hands over can be read straight through. Copying a quarter of a
+ * million floats into a plain array just to satisfy a signature is a real cost
+ * on the machines this runs on.
+ */
+export type MeshPositions = ArrayLike<number>;
+
 export type MeshTopology = {
   /** Welded vertex positions, 3 numbers per vertex. */
   vertices: Float64Array;
@@ -41,7 +51,7 @@ function cellKey(x: number, y: number, z: number) {
  * cell boundary still finds each other — the failure mode that makes naive grid
  * hashing split a watertight mesh into two shells.
  */
-function weldVertices(positions: readonly number[], tolerance: number) {
+function weldVertices(positions: MeshPositions, tolerance: number) {
   const cellSize = Math.max(tolerance, 1e-12) * 2;
   const buckets = new Map<string, number[]>();
   const vertices: number[] = [];
@@ -89,18 +99,39 @@ function weldVertices(positions: readonly number[], tolerance: number) {
   return { vertices: Float64Array.from(vertices), indexOf };
 }
 
-export function buildMeshTopology(positions: readonly number[], weldTolerance = DEFAULT_WELD_TOLERANCE): MeshTopology {
+/**
+ * Builds the connected mesh.
+ *
+ * Two input shapes are accepted, because the two sources genuinely differ. An
+ * STL import is a triangle soup: `positions` alone, every three vertices a
+ * triangle. The CAD kernel's tessellation is indexed: `positions` holds each
+ * vertex once and `indices` says how they join. Feeding an indexed mesh in as a
+ * soup silently reads it as a third as many triangles made of the wrong corners
+ * — a box comes out as eight triangles with fourteen boundary edges, and every
+ * later stage then reports a perfectly good solid as an open shell.
+ */
+export function buildMeshTopology(
+  positions: MeshPositions,
+  weldTolerance = DEFAULT_WELD_TOLERANCE,
+  indices?: ArrayLike<number>,
+): MeshTopology {
   const { vertices, indexOf } = weldVertices(positions, weldTolerance);
-  const rawTriangleCount = Math.floor(indexOf.length / 3);
+  const corners: ArrayLike<number> = indices ?? indexOf;
+  const rawTriangleCount = Math.floor(corners.length / 3);
+  // Welding may merge vertices the index buffer still names separately, so an
+  // indexed corner is mapped through the weld before it is used.
+  const cornerAt = indices
+    ? (slot: number) => indexOf[indices[slot]]
+    : (slot: number) => indexOf[slot];
 
   const triangles: number[] = [];
   const normals: number[] = [];
   const areas: number[] = [];
 
   for (let triangle = 0; triangle < rawTriangleCount; triangle += 1) {
-    const a = indexOf[triangle * 3];
-    const b = indexOf[triangle * 3 + 1];
-    const c = indexOf[triangle * 3 + 2];
+    const a = cornerAt(triangle * 3);
+    const b = cornerAt(triangle * 3 + 1);
+    const c = cornerAt(triangle * 3 + 2);
     // Welding collapses slivers into degenerate triangles; they carry no surface
     // information and would poison the normal-based segmentation.
     if (a === b || b === c || a === c) continue;

@@ -10,13 +10,13 @@
 // can tell the user "48 planes, 12 cylinders, 3 regions kept as facets" instead
 // of silently presenting a partial reconstruction as a finished conversion.
 
-import { buildMeshTopology, isManifold, type MeshTopology } from "@/lib/meshToBrep/meshTopology";
+import { buildMeshTopology, isManifold, type MeshPositions, type MeshTopology } from "@/lib/meshToBrep/meshTopology";
 import { segmentMesh, type MeshSegment, type SegmentationOptions } from "@/lib/meshToBrep/segmentation";
 import { regularizeSegments, type RegularizeOptions, type RegularizeReport } from "@/lib/meshToBrep/regularize";
 import type { SurfaceKind } from "@/lib/meshToBrep/surfaceFit";
 
 export { buildMeshTopology, isManifold, triangleCentroid, triangleNormal, triangleVertex } from "@/lib/meshToBrep/meshTopology";
-export type { MeshTopology, Vec3 } from "@/lib/meshToBrep/meshTopology";
+export type { MeshPositions, MeshTopology, Vec3 } from "@/lib/meshToBrep/meshTopology";
 export { segmentMesh, canonicalDirection } from "@/lib/meshToBrep/segmentation";
 export type { MeshSegment, SegmentationOptions, SegmentationResult } from "@/lib/meshToBrep/segmentation";
 export { regularizeSegments } from "@/lib/meshToBrep/regularize";
@@ -63,10 +63,12 @@ function emptyTally(): SurfaceTally {
 }
 
 export function analyzeMeshForConversion(
-  positions: readonly number[],
+  positions: MeshPositions,
   settings: MeshConversionSettings = {},
+  /** Present when the mesh is indexed, as the CAD kernel's tessellation is. */
+  indices?: ArrayLike<number>,
 ): MeshConversionAnalysis {
-  const topology = buildMeshTopology(positions);
+  const topology = buildMeshTopology(positions, undefined, indices);
   const { segments, unassignedTriangles } = segmentMesh(topology, settings);
   const { segments: regularized, report } = regularizeSegments(segments, settings);
 

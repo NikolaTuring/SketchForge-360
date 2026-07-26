@@ -6,6 +6,7 @@ import type { ManifoldToplevel } from "manifold-3d";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
 import { ContextMenu, type ContextMenuState } from "@/components/editor/ContextMenu";
+import { useBrepFeatureWorker } from "@/lib/brepFeatureClient";
 /**
  * How far the pointer may travel between right-press and release and still
  * count as a click rather than an orbit. Generous enough for a hand that is not
@@ -5277,6 +5278,7 @@ export function SketchForgeEditor({
   const [topPanel, setTopPanel] = useState<TopPanel>(null);
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const brepFeatures = useBrepFeatureWorker();
   const rightPressRef = useRef<{ x: number; y: number } | null>(null);
   const { t } = useTranslation();
   const { layout, setLayout } = useEditorLayout();
@@ -5653,6 +5655,17 @@ export function SketchForgeEditor({
   }, [initialSnap]);
 
   const selectedShapes = useMemo(() => shapes.filter((shape) => selectedIds.includes(shape.id)), [selectedIds, shapes]);
+  /**
+   * The one imported mesh in the selection, if that is what the selection is.
+   *
+   * Surface recognition answers a question about a single body, so more than
+   * one selected — or a body that was modelled rather than imported — leaves
+   * the command unavailable rather than guessing which one was meant.
+   */
+  const selectedMesh = useMemo(
+    () => (selectedShapes.length === 1 && selectedShapes[0].importedMesh ? selectedShapes[0] : null),
+    [selectedShapes],
+  );
   const selectedShape = selectedShapes.at(-1) ?? null;
   const hasSelection = selectedShapes.length > 0;
   const modifierAvailableEdgeIds = useMemo(
@@ -7361,6 +7374,36 @@ export function SketchForgeEditor({
     commitShapes([...shapes.filter((shape) => !groupIds.has(shape.id)), ...restored], restored.map((shape) => shape.id), `Ungrouped ${groups.length} group${groups.length === 1 ? "" : "s"}`);
   }, [commitShapes, selectedShapes, shapes]);
 
+  /**
+   * Recognises the analytic surfaces in the selected imported mesh.
+   *
+   * This is the first half of turning a triangle soup back into CAD geometry:
+   * it says what the mesh is made of before anything is rebuilt, so someone can
+   * see whether the part is a good candidate at all. The answer is reported
+   * honestly — coverage and leftovers included — rather than presented as a
+   * finished conversion.
+   */
+  const analyzeSelectedMesh = useCallback(() => {
+    const shape = selectedMesh;
+    const positions = shape?.importedMesh?.positions;
+    if (!shape || !positions) {
+      setNotice(translate("notice.selectImportedMesh"));
+      return;
+    }
+    setNotice(translate("notice.analyzingMesh"));
+    brepFeatures
+      .convertMesh(Float32Array.from(positions))
+      .then((report) => {
+        // The summary is deliberately the kernel-free description rather than a
+        // verdict: "6 planes, 1 cylinder — 100% of the surface" tells the user
+        // what was found, and leaves the decision to rebuild to them.
+        setNotice(report.manifold ? report.summary : `${report.summary} ${translate("notice.meshNotClosed")}`);
+      })
+      .catch((error: unknown) => {
+        setNotice(error instanceof Error ? error.message : translate("notice.meshAnalysisFailed"));
+      });
+  }, [brepFeatures, selectedMesh]);
+
   const separateSelectedParts = useCallback(() => {
     if (selectedShapes.length !== 1 || !selectedShape) {
       setNotice(translate("notice.selectOneToSeparate"));
@@ -8515,6 +8558,7 @@ export function SketchForgeEditor({
     { id: "workplane", labelKey: "tool.workplane", tab: "solid", groupKey: "section.arrange", icon: ToolbarWorkplaneIcon, run: activateWorkplaneTool, isEnabled: true, isActive: workplaneMode },
     { id: "drop-to-workplane", labelKey: "tool.dropToWorkplane", tab: "solid", groupKey: "section.arrange", icon: ToolbarDropToWorkplaneIcon, run: dropSelectedToWorkplane, isEnabled: hasSelection, shortcut: "D" },
     { id: "separate-parts", labelKey: "tool.separateParts", tab: "mesh", groupKey: "section.modify", run: separateSelectedParts, isEnabled: canSeparateSelectedParts },
+    { id: "analyze-mesh", labelKey: "tool.analyzeMesh", tab: "mesh", groupKey: "section.inspect", run: analyzeSelectedMesh, isEnabled: Boolean(selectedMesh) },
     { id: "sketch-create", labelKey: "sketch.extrudeTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("extrude"), isEnabled: !sketchActive },
     { id: "sketch-revolve", labelKey: "sketch.revolveTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("revolve"), isEnabled: !sketchActive },
     { id: "sketch-edit", labelKey: "sketch.edit", tab: "sketch", groupKey: "section.create", run: beginSketchEdit, isEnabled: selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile) },
@@ -8823,6 +8867,7 @@ export function SketchForgeEditor({
       <input
         ref={fileInputRef}
         className="hidden-file-input"
+        data-testid="import-file-input"
         type="file"
         multiple
         accept=".stl,.step,.stp,.svg,image/svg+xml"
