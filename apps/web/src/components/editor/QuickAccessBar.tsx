@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { LanguageSwitch } from "@/components/editor/LanguageSwitch";
+import { ThemeSwitch } from "@/components/editor/ThemeSwitch";
 import { ToolbarImportIcon, ToolbarSettingsIcon, ToolbarVectorExportIcon } from "@/components/icons";
 import { useTranslation } from "@/lib/i18n";
 
@@ -93,6 +94,7 @@ export function QuickAccessBar({
         >
           {shortcut}
         </button>
+        <ThemeSwitch />
         <LanguageSwitch />
       </div>
     </div>

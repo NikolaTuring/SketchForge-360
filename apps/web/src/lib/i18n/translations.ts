@@ -10,6 +10,10 @@
 
 export const TRANSLATIONS = {
   // --- Language switcher -------------------------------------------------
+  "theme.label": { en: "Theme", de: "Darstellung" },
+  "theme.system": { en: "System", de: "System" },
+  "theme.light": { en: "Light", de: "Hell" },
+  "theme.dark": { en: "Dark", de: "Dunkel" },
   "language.label": { en: "Language", de: "Sprache" },
   "language.en": { en: "English", de: "Englisch" },
   "language.de": { en: "German", de: "Deutsch" },

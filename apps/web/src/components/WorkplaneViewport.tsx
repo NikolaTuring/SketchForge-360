@@ -3371,6 +3371,35 @@ export function WorkplaneViewport({
     [onAddShape, toPlanePoint],
   );
 
+  /*
+   * Follow the theme after start-up too.
+   *
+   * The clear colour is read once when the scene is built, so a theme changed
+   * later would leave a white canvas inside a dark interface until the next
+   * reload. The attribute is watched rather than the choice, because "system"
+   * can change without anyone touching the switch.
+   */
+  useEffect(() => {
+    const apply = () => {
+      const state = threeRef.current;
+      if (!state) return;
+      // Rebuilding the workplane rather than poking its material: the plate,
+      // the grid lines and the background are all built from the theme in one
+      // place, and repainting only some of them is how they drift apart.
+      rebuildWorkplane(state, normalizeWorkspaceSettings(workspaceRef.current));
+      state.needsRender = true;
+    };
+    const observer = new MutationObserver(apply);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    media.addEventListener("change", apply);
+    apply();
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", apply);
+    };
+  }, []);
+
   const resetView = useCallback(() => {
     const state = threeRef.current;
     if (state) {
@@ -3791,7 +3820,10 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   host.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color("#f8fbfc");
+  // Read from the stylesheet rather than hard-coded, so the 3D background
+  // follows the theme like everything around it. A white canvas framed by a
+  // dark interface is the single most jarring part of a half-themed editor.
+  scene.background = new THREE.Color(viewportBackgroundColor());
 
   const camera = new THREE.PerspectiveCamera(38, host.clientWidth / Math.max(1, host.clientHeight), 0.1, 6000);
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -3913,6 +3945,25 @@ function createThreeScene(host: HTMLDivElement): ThreeState {
   return state;
 }
 
+/**
+ * The viewport's clear colour, taken from the document's own tokens.
+ *
+ * Falls back to the light value when the variable cannot be read — during a
+ * server render, or if the stylesheet has not applied yet — because a scene
+ * with no background at all renders black and looks like a crash.
+ */
+/** The workplane plate's colour, so the grid does not glare out of a dark scene. */
+function workplaneSurfaceColor(): string {
+  if (typeof document === "undefined") return "#ddf8ff";
+  return getComputedStyle(document.documentElement).getPropertyValue("--sf-workplane").trim() || "#ddf8ff";
+}
+
+function viewportBackgroundColor(): string {
+  if (typeof window === "undefined" || typeof document === "undefined") return "#f8fbfc";
+  const value = getComputedStyle(document.documentElement).getPropertyValue("--sf-viewport").trim();
+  return value || "#f8fbfc";
+}
+
 function resetCamera(state: ThreeState) {
   state.camera.up.set(0, 1, 0);
   state.camera.position.copy(CAMERA_HOME);
@@ -4025,14 +4076,19 @@ function rebuildWorkplane(state: ThreeState | null, workspace: WorkspaceSettings
   }
 
   disposeChildren(state.workplaneLayer);
-  state.scene.background = new THREE.Color(workspace.background);
+  // The workspace's own background wins when someone has chosen one; the theme
+  // decides only while it is still the default. Overriding a deliberate choice
+  // because the interface went dark would be the wrong way round.
+  state.scene.background = new THREE.Color(
+    workspace.background === DEFAULT_WORKPLANE_WORKSPACE.background ? viewportBackgroundColor() : workspace.background,
+  );
   state.renderer.shadowMap.enabled = workspace.showShadows;
   state.controls.zoomSpeed = 0.28 + workspace.zoomSpeed * 0.09;
 
   const base = new THREE.Mesh(
     new THREE.PlaneGeometry(workspace.width, workspace.depth),
     new THREE.MeshStandardMaterial({
-      color: "#ddf8ff",
+      color: workplaneSurfaceColor(),
       transparent: true,
       opacity: 0.68,
       roughness: 0.92,

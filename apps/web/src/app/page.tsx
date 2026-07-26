@@ -8,6 +8,7 @@ import { createLocalId } from "@/lib/localIds";
 import { attachProjectAsset, dedupeProjectAssets, projectAssetFromBytes, sourceFormatForFileName } from "@/lib/projectAssets";
 import { importSkfProject, SKF_CREATED_WITH_VERSION } from "@/lib/skfProject";
 import { importExtensionSupported } from "@/lib/stlImport";
+import { applyTheme, getTheme } from "@/lib/theme";
 import { DEFAULT_SNAP_GRID, DEFAULT_WORKPLANE_WORKSPACE, normalizeSnapGrid, normalizeWorkspaceSettings, workplaneSettingsFingerprint } from "@/lib/workplaneSettings";
 import type { GridSize, ProjectAsset, WorkplaneShape, WorkplaneWorkspaceSettings } from "@/types/sketchforge";
 
@@ -333,13 +334,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.removeAttribute("data-theme");
-    document.documentElement.style.colorScheme = "light";
-    try {
-      window.localStorage.removeItem("sketchForge.theme");
-    } catch {
-      // Light mode still applies when browser storage is unavailable.
-    }
+    // A theme system existed here once and was replaced by a block that deleted
+    // the stored choice on every load. The choice is honoured again.
+    applyTheme(getTheme());
     const { projects: storedProjects, legacyShapes } = readStoredProjects();
     setProjects(storedProjects);
     if (Object.keys(legacyShapes).length > 0) {
