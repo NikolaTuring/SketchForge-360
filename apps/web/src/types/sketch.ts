@@ -12,6 +12,7 @@
 //   - angle *dimensions* are degrees, because that is what the user types
 //   - arcs always sweep counter-clockwise from `startAngle` to `endAngle`
 
+import type { SketchParameter } from "@/lib/parameterExpressions";
 import type { SketchImage } from "@/types/sketchforge";
 
 export type Vec2 = { x: number; y: number };
@@ -152,4 +153,13 @@ export type Sketch = {
   /** Reference underlays, carried over unchanged from the freehand sketcher. */
   images?: SketchImage[];
   planeResolution?: SketchPlaneResolution;
+  /**
+   * Named values the sketch's dimensions can refer to.
+   *
+   * They live on the sketch rather than on the project so they save and load
+   * with the body that uses them, instead of being a second thing to remember
+   * to send along. Sharing one table across a whole project is the obvious next
+   * step and is not built yet.
+   */
+  parameters?: SketchParameter[];
 };

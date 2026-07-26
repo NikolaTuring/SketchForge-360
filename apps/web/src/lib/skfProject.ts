@@ -397,6 +397,17 @@ function validateParametricSketch(raw: unknown, label: string) {
     stringValue(item.id, `${label}.sketch.entities[${index}].id`);
     stringValue(item.type, `${label}.sketch.entities[${index}].type`);
   });
+  if (sketch.parameters !== undefined) {
+    if (!Array.isArray(sketch.parameters) || sketch.parameters.length > SKF_LIMITS.sketchEntities) {
+      throw new Error(`${label}.sketch.parameters is invalid`);
+    }
+    sketch.parameters.forEach((parameter, index) => {
+      const item = objectRecord(parameter, `${label}.sketch.parameters[${index}]`);
+      stringValue(item.id, `${label}.sketch.parameters[${index}].id`);
+      stringValue(item.name, `${label}.sketch.parameters[${index}].name`);
+      stringValue(item.expression, `${label}.sketch.parameters[${index}].expression`);
+    });
+  }
   sketch.constraints.forEach((constraint, index) => {
     const item = objectRecord(constraint, `${label}.sketch.constraints[${index}]`);
     stringValue(item.id, `${label}.sketch.constraints[${index}].id`);

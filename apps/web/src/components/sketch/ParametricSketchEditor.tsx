@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ParametersDialog } from "@/components/sketch/ParametersDialog";
 import { entitiesBounds, entityHandles, entityMidpoint, entityPath } from "@/components/sketch/sketchRender";
-import { evaluateExpression } from "@/lib/parameterExpressions";
+import { evaluateExpression, evaluateParameterTable, type SketchParameter } from "@/lib/parameterExpressions";
 import { distanceVec2, pointRef, vec2 } from "@/lib/sketchEntities";
 import {
   circularPattern,
@@ -68,8 +69,6 @@ const DIMENSION_KINDS = [
 
 export type ParametricSketchEditorProps = {
   initial: Sketch;
-  /** Named parameters a dimension expression may refer to. */
-  parameters?: ReadonlyMap<string, number>;
   /** The distance is part of finishing, so the button says what it will build. */
   onFinish: (sketch: Sketch, extrudeDistance: number) => void;
   busy?: boolean;
@@ -82,7 +81,6 @@ type PickTarget = { kind: "entity"; id: SketchEntityId } | { kind: "point"; ref:
 
 export function ParametricSketchEditor({
   initial,
-  parameters,
   onFinish,
   onCancel,
   onDegreesOfFreedomChange,
@@ -114,6 +112,8 @@ export function ParametricSketchEditor({
   const [patternCount, setPatternCount] = useState(3);
   const [patternSpacing, setPatternSpacing] = useState(20);
   const [extrudeDistance, setExtrudeDistance] = useState(10);
+  const [parameters, setParameters] = useState<SketchParameter[]>(initial.parameters ?? []);
+  const [parametersOpen, setParametersOpen] = useState(false);
 
   const nextId = useCallback(() => {
     idCounter.current += 1;
@@ -131,13 +131,23 @@ export function ParametricSketchEditor({
   }, [initial]);
 
   const sketch = useMemo<Sketch>(
-    () => ({ ...initial, entities, constraints }),
-    [constraints, entities, initial],
+    () => ({ ...initial, entities, constraints, ...(parameters.length ? { parameters } : {}) }),
+    [constraints, entities, initial, parameters],
   );
 
+  /*
+   * Parameter values, resolved in dependency order.
+   *
+   * A row that cannot be evaluated is simply absent from the scope rather than
+   * contributing a zero, so a dimension that depends on it reports "unknown
+   * name" — which points at the broken parameter instead of silently
+   * collapsing the geometry.
+   */
+  const parameterScope = useMemo(() => evaluateParameterTable(parameters).values, [parameters]);
+
   const solved = useMemo(
-    () => solveSketch(sketch, { parameterScope: parameters }),
-    [parameters, sketch],
+    () => solveSketch(sketch, { parameterScope }),
+    [parameterScope, sketch],
   );
 
   useEffect(() => {
@@ -346,7 +356,7 @@ export function ParametricSketchEditor({
     (type: string, expression: string) => {
       let value: number;
       try {
-        value = evaluateExpression(expression, parameters);
+        value = evaluateExpression(expression, parameterScope);
       } catch (error) {
         // The parser's own message names the offending token, which is far more
         // use than "invalid expression".
@@ -382,7 +392,7 @@ export function ParametricSketchEditor({
       setMessage("");
       return true;
     },
-    [entities, nextId, parameters, selectedEntityIds, t],
+    [entities, nextId, parameterScope, selectedEntityIds, t],
   );
 
   const applyPattern = useCallback(
@@ -711,8 +721,26 @@ export function ParametricSketchEditor({
             <button type="button" data-testid="sketch-zoom-out" aria-label={t("sketch.zoomOut")} onClick={() => zoom(1.25)}>−</button>
             <button type="button" data-testid="sketch-fit" aria-label={t("sketch.fit")} onClick={fit}>⤢</button>
           </div>
+          <button
+            type="button"
+            className="sketch-parameters-button"
+            data-testid="sketch-parameters"
+            aria-expanded={parametersOpen}
+            onClick={() => setParametersOpen((open) => !open)}
+          >
+            {t("parameters.title")}
+          </button>
         </div>
       </aside>
+
+      {parametersOpen ? (
+        <ParametersDialog
+          parameters={parameters}
+          nextId={nextId}
+          onChange={setParameters}
+          onClose={() => setParametersOpen(false)}
+        />
+      ) : null}
 
       <footer className="sketch-status" data-testid="sketch-status">
         <span data-testid="sketch-dof">

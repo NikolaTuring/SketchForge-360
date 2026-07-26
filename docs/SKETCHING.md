@@ -220,9 +220,10 @@ million entities would freeze the tab before any error could be shown.
   viewport does not yet pick faces.
 - A feature timeline: a body remembers one sketch and rebuilds from it, but there
   is no ordered list of features to reorder, suppress or roll back.
-- Named parameters shared across sketches. Dimensions accept expressions with
-  units and arithmetic (`1cm + 5`), but not yet references to a project-wide
-  parameter table.
+- A project-wide parameter table. A sketch has its own named parameters —
+  `wandstaerke = 2mm`, then `wandstaerke * 3` in any dimension — and they save
+  and load with the body that uses them, but they are not shared between
+  sketches.
 - Automatic constraint inference while drawing, with snap glyphs.
 - Dragging geometry to re-solve interactively.
 - Sweep and loft, though the kernel supports both.

@@ -448,6 +448,14 @@ export const TRANSLATIONS = {
   "mesh.leftover": { en: "{count} triangles matched no analytic surface and would stay as facets.", de: "{count} Dreiecke passten auf keine analytische Fläche und blieben Facetten." },
   "mesh.cleanup": { en: "Cleaned up: {axes} axes snapped, {rounded} dimensions rounded, {coaxial} coaxial groups merged.", de: "Bereinigt: {axes} Achsen gefangen, {rounded} Maße gerundet, {coaxial} koaxiale Gruppen zusammengefasst." },
 
+  "parameters.title": { en: "Parameters", de: "Parameter" },
+  "parameters.empty": { en: "No parameters yet. Add one to reuse a value across dimensions.", de: "Noch keine Parameter. Einen anlegen, um einen Wert mehrfach zu nutzen." },
+  "parameters.name": { en: "Name", de: "Name" },
+  "parameters.expression": { en: "Expression", de: "Ausdruck" },
+  "parameters.value": { en: "Value", de: "Wert" },
+  "parameters.add": { en: "Add parameter", de: "Parameter hinzufügen" },
+  "parameters.remove": { en: "Remove parameter", de: "Parameter entfernen" },
+
   "sketch.choosePlane": { en: "Choose a sketch plane", de: "Skizzenebene wählen" },
   "sketch.planeOffset": { en: "Offset (mm)", de: "Versatz (mm)" },
   "sketch.startSketch": { en: "Start sketch", de: "Skizze beginnen" },

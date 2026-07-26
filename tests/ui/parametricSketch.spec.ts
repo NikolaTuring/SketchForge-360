@@ -293,3 +293,47 @@ test("only offers the edit command for a body that has a sketch", async ({ page 
   await page.getByTestId("tab-sketch").click();
   await expect(page.getByTestId("tool-edit-parametric-sketch")).toBeDisabled();
 });
+
+test("a named parameter drives a dimension", async ({ page }) => {
+  await startSketch(page);
+  await page.getByTestId("sketch-tool-circle").click();
+  await clickSketch(page, 0, 0);
+  await clickSketch(page, 10, 0);
+
+  await page.getByTestId("sketch-parameters").click();
+  await page.getByTestId("parameters-add").click();
+  const row = page.locator("[data-testid^='parameter-name-']").first();
+  const id = (await row.getAttribute("data-testid"))!.replace("parameter-name-", "");
+  await page.getByTestId(`parameter-name-${id}`).fill("bohrung");
+  await page.getByTestId(`parameter-expression-${id}`).fill("3cm");
+  await expect(page.getByTestId(`parameter-value-${id}`)).toHaveText("30");
+
+  await page.getByTestId("parameters-close").click();
+  await page.getByTestId("sketch-tool-select").click();
+  await clickSketch(page, 10, 0);
+  await page.getByTestId("dimension-radius").click();
+  await page.getByTestId("dimension-input").fill("bohrung / 2");
+  await page.getByTestId("dimension-apply").click();
+
+  // Naming a value once and referring to it is the point: the circle has to
+  // follow the parameter, not the click that drew it.
+  await expect
+    .poll(() =>
+      page.locator("[data-entity-type='circle']").evaluate((node) => (node as SVGGraphicsElement).getBBox().width),
+    )
+    .toBeCloseTo(30, 0);
+});
+
+test("a broken parameter says so instead of resolving to zero", async ({ page }) => {
+  await startSketch(page);
+  await page.getByTestId("sketch-parameters").click();
+  await page.getByTestId("parameters-add").click();
+  const row = page.locator("[data-testid^='parameter-name-']").first();
+  const id = (await row.getAttribute("data-testid"))!.replace("parameter-name-", "");
+
+  await page.getByTestId(`parameter-expression-${id}`).fill("2 * ");
+  // The error replaces the value: a stale number beside a broken expression is
+  // the one thing that could make someone trust a wrong dimension.
+  await expect(page.getByTestId(`parameter-row-${id}`)).toHaveClass(/invalid/);
+  await expect(page.getByTestId(`parameter-value-${id}`)).not.toHaveText("0");
+});

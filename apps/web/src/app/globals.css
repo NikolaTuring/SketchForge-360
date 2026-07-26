@@ -6654,3 +6654,117 @@ button {
   border-radius: 3px;
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------------
+ * Sketch parameters
+ * ------------------------------------------------------------------------ */
+
+.sketch-parameters-button {
+  height: 26px;
+  color: var(--sf-text);
+  font-size: 11px;
+  font-weight: 800;
+  background: var(--sf-surface-raised);
+  border: 1px solid var(--sf-line);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.parameters-dialog {
+  position: absolute;
+  top: 60px;
+  right: 230px;
+  z-index: 50;
+  width: min(420px, calc(100vw - 40px));
+  color: var(--sf-text-strong);
+  background: var(--sf-surface-raised);
+  border: 1px solid var(--sf-line);
+  border-radius: 6px;
+  box-shadow: 0 18px 44px var(--sf-shadow);
+}
+
+.parameters-dialog header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 8px 8px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--sf-line);
+}
+
+.parameters-dialog header button {
+  width: 24px;
+  height: 24px;
+  color: var(--sf-text-muted);
+  font-size: 17px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.parameters-body {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.parameters-body table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.parameters-body th {
+  padding-bottom: 4px;
+  color: var(--sf-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.parameters-body td {
+  padding: 2px 4px 2px 0;
+}
+
+.parameters-body input {
+  width: 100%;
+  height: 24px;
+  padding: 0 6px;
+  color: var(--sf-text-strong);
+  background: var(--sf-surface);
+  border: 1px solid var(--sf-line);
+  border-radius: 3px;
+}
+
+/* An error replaces the value rather than sitting beside it: a stale number
+ * next to a broken expression is what makes someone trust a wrong dimension. */
+.parameters-body tr.invalid .parameters-value {
+  color: #b3261e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.parameters-value {
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.parameters-empty {
+  margin: 0;
+  color: var(--sf-text-muted);
+  font-size: 12px;
+}
+
+.parameters-body button.primary {
+  justify-self: start;
+  height: 26px;
+  padding: 0 12px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  background: #1f6fa8;
+  border-radius: 3px;
+  cursor: pointer;
+}
