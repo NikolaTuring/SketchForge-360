@@ -7,6 +7,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import { translate, translatePlural, useTranslation, type TranslationKey } from "@/lib/i18n";
 import { ContextMenu, type ContextMenuState } from "@/components/editor/ContextMenu";
 import { useBrepFeatureWorker } from "@/lib/brepFeatureClient";
+import { ParametricSketchEditor } from "@/components/sketch/ParametricSketchEditor";
+import { SketchPlanePicker } from "@/components/sketch/SketchPlanePicker";
+import { workplaneShapeFromFeatureBody } from "@/lib/parametricBody";
+import type { Sketch, SketchPlaneRef } from "@/types/sketch";
 /**
  * How far the pointer may travel between right-press and release and still
  * count as a click rather than an orbit. Generous enough for a hand that is not
@@ -5279,6 +5283,17 @@ export function SketchForgeEditor({
   const [commandSearchOpen, setCommandSearchOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const brepFeatures = useBrepFeatureWorker();
+  /*
+   * The parametric sketcher runs as its own mode over the viewport.
+   *
+   * It is deliberately separate from the freehand sketch below rather than a
+   * replacement: the freehand path is what existing projects were drawn with,
+   * and swapping it out would change how they reopen.
+   */
+  const [parametricStage, setParametricStage] = useState<
+    { stage: "plane" } | { stage: "draw"; sketch: Sketch } | null
+  >(null);
+  const [parametricBusy, setParametricBusy] = useState(false);
   const rightPressRef = useRef<{ x: number; y: number } | null>(null);
   const { t } = useTranslation();
   const { layout, setLayout } = useEditorLayout();
@@ -7383,6 +7398,36 @@ export function SketchForgeEditor({
    * honestly — coverage and leftovers included — rather than presented as a
    * finished conversion.
    */
+  /**
+   * Builds the body a finished parametric sketch describes.
+   *
+   * The result goes through `commitShapes` like any other change, so it lands
+   * in undo and autosave without a special case — a parametric body is a body.
+   */
+  const finishParametricSketch = useCallback(
+    (sketch: Sketch, distance: number) => {
+      setParametricBusy(true);
+      setNotice(translate("notice.buildingFeature"));
+      brepFeatures
+        .buildSketchFeature({ sketch, regionKeys: null, operation: "new", extrude: { distance } })
+        .then((body) => {
+          const shape = workplaneShapeFromFeatureBody(body, {
+            id: createLocalId("sketch-body"),
+            name: translate("name.sketchBody"),
+          });
+          commitShapes([...shapesRef.current, shape], [shape.id], translate("notice.featureBuilt"));
+          setParametricStage(null);
+        })
+        .catch((error: unknown) => {
+          // The worker's message names the actual problem — an open profile, a
+          // zero distance — so it is shown rather than replaced by a generic one.
+          setNotice(error instanceof Error ? error.message : translate("notice.featureFailed"));
+        })
+        .finally(() => setParametricBusy(false));
+    },
+    [brepFeatures, commitShapes],
+  );
+
   const analyzeSelectedMesh = useCallback(() => {
     const shape = selectedMesh;
     const positions = shape?.importedMesh?.positions;
@@ -8559,18 +8604,27 @@ export function SketchForgeEditor({
     { id: "drop-to-workplane", labelKey: "tool.dropToWorkplane", tab: "solid", groupKey: "section.arrange", icon: ToolbarDropToWorkplaneIcon, run: dropSelectedToWorkplane, isEnabled: hasSelection, shortcut: "D" },
     { id: "separate-parts", labelKey: "tool.separateParts", tab: "mesh", groupKey: "section.modify", run: separateSelectedParts, isEnabled: canSeparateSelectedParts },
     { id: "analyze-mesh", labelKey: "tool.analyzeMesh", tab: "mesh", groupKey: "section.inspect", run: analyzeSelectedMesh, isEnabled: Boolean(selectedMesh) },
-    { id: "sketch-create", labelKey: "sketch.extrudeTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("extrude"), isEnabled: !sketchActive },
-    { id: "sketch-revolve", labelKey: "sketch.revolveTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("revolve"), isEnabled: !sketchActive },
-    { id: "sketch-edit", labelKey: "sketch.edit", tab: "sketch", groupKey: "section.create", run: beginSketchEdit, isEnabled: selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile) },
+    {
+      id: "parametric-sketch",
+      labelKey: "sketch.parametric",
+      tab: "sketch",
+      groupKey: "section.create",
+      run: () => setParametricStage({ stage: "plane" }),
+      isEnabled: !sketchActive && !parametricStage,
+      isActive: Boolean(parametricStage),
+    },
+    { customControl: true, id: "sketch-create", labelKey: "sketch.extrudeTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("extrude"), isEnabled: !sketchActive },
+    { customControl: true, id: "sketch-revolve", labelKey: "sketch.revolveTitle", tab: "sketch", groupKey: "section.create", run: () => beginSketch("revolve"), isEnabled: !sketchActive },
+    { customControl: true, id: "sketch-edit", labelKey: "sketch.edit", tab: "sketch", groupKey: "section.create", run: beginSketchEdit, isEnabled: selectedShapes.length === 1 && Boolean(selectedShape?.sketchProfile) },
     { id: "import", labelKey: "tool.import", tab: "utilities", groupKey: "section.manage", icon: ToolbarImportIcon, run: () => setTopPanel((current) => (current === "import" ? null : "import")), isEnabled: true },
     { id: "export", labelKey: "tool.export", tab: "utilities", groupKey: "section.manage", icon: ToolbarVectorExportIcon, run: () => setTopPanel((current) => (current === "export" ? null : "export")), isEnabled: true },
     { id: "workspace-settings", labelKey: "tool.workspaceSettings", tab: "utilities", groupKey: "section.manage", icon: ToolbarSettingsIcon, run: () => window.dispatchEvent(new Event("sketchforge:open-workspace-settings")), isEnabled: true },
   ], [
-    activateWorkplaneTool, alignMode, beginSketch, beginSketchEdit, canEdgeModifySelection, canSeparateSelectedParts,
+    activateWorkplaneTool, alignMode, analyzeSelectedMesh, beginSketch, beginSketchEdit, canEdgeModifySelection, canSeparateSelectedParts,
     cancelEdgeModifier, clipboard.length, copySelected, deleteSelected, dropSelectedToWorkplane, duplicateSelected,
     edgeModifier, groupSelected, hasSelection, history.length, historyIndex, intersectSelected, mirrorMode,
-    pasteShape, projectInteractionActive, redo, selectedShape, selectedShapes, separateSelectedParts, sketchActive,
-    snapSelected, startEdgeModifier, systemClipboardSupported, toggleAlignMode, toggleHidden, toggleMirrorMode,
+    parametricStage, pasteShape, projectInteractionActive, redo, selectedShape, selectedShapes, separateSelectedParts, sketchActive,
+    selectedMesh, snapSelected, startEdgeModifier, systemClipboardSupported, toggleAlignMode, toggleHidden, toggleMirrorMode,
     ungroupSelected, undo, workplaneMode,
   ]);
 
@@ -8774,6 +8828,28 @@ export function SketchForgeEditor({
           />
         )}
       </div>
+      {parametricStage ? (
+        <div className="parametric-overlay" data-testid="parametric-overlay">
+          {parametricStage.stage === "plane" ? (
+            <SketchPlanePicker
+              onCancel={() => setParametricStage(null)}
+              onStart={(plane: SketchPlaneRef) =>
+                setParametricStage({
+                  stage: "draw",
+                  sketch: { id: createLocalId("sketch"), name: translate("sketch.parametric"), plane, entities: [], constraints: [] },
+                })
+              }
+            />
+          ) : (
+            <ParametricSketchEditor
+              initial={parametricStage.sketch}
+              busy={parametricBusy}
+              onCancel={() => setParametricStage(null)}
+              onFinish={finishParametricSketch}
+            />
+          )}
+        </div>
+      ) : null}
       {edgeModifier ? (
         <EdgeModifierPanel
           kind={edgeModifier.kind}
@@ -9388,6 +9464,13 @@ function SecondaryToolbar({
                 </div>
               </div>
             )}
+            {/*
+              Registry commands are appended rather than replacing the sections
+              above: the freehand controls carry widgets a button list cannot
+              express, but a command registered on this tab has to appear on it
+              or the ribbon and the command search disagree about what exists.
+            */}
+            <RibbonCommandGroups commands={commands} tab="sketch" />
           </div>
         ) : (
           <RibbonCommandGroups commands={commands} tab={toolbarMode} />

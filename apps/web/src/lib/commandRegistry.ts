@@ -35,6 +35,13 @@ export type EditorCommand = {
   keywordsKey?: TranslationKey;
   /** Keep out of the command search (separators, duplicates of another entry). */
   hidden?: boolean;
+  /**
+   * The tab draws its own control for this command, so the generated ribbon
+   * group skips it. It still belongs in the registry: the search, the keyboard
+   * and the context menu all reach it through the same entry, and leaving it
+   * out would be the drift this module exists to prevent.
+   */
+  customControl?: boolean;
 };
 
 /**
@@ -108,7 +115,7 @@ export function filterCommands(entries: readonly SearchableCommand[], query: str
 }
 
 export function commandsForTab(commands: readonly EditorCommand[], tab: RibbonTab): EditorCommand[] {
-  return commands.filter((command) => command.tab === tab);
+  return commands.filter((command) => command.tab === tab && !command.customControl);
 }
 
 export type CommandGroup = { groupKey: TranslationKey; commands: EditorCommand[] };
