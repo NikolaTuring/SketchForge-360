@@ -1109,7 +1109,7 @@ function Dashboard({
           ) : (
             <>
               <div className="dashboard-actions-band">
-                <button className="dashboard-action-tile create" type="button" onClick={onCreate}>
+                <button className="dashboard-action-tile create" data-testid="dashboard-create-project" type="button" onClick={onCreate}>
                   <span className="dashboard-action-icon">
                     <Plus size={25} strokeWidth={2.8} />
                   </span>

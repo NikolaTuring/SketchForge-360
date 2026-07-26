@@ -198,7 +198,7 @@ export function EdgeModifierPanel({
   const amountMin = Math.min(MIN_EDGE_MODIFIER_AMOUNT, Math.max(Number.EPSILON, maxAmount));
   const amountMax = Math.max(amountMin, maxAmount);
   return (
-    <aside className="edge-modifier-panel" aria-label={title}>
+    <aside className="edge-modifier-panel" data-testid="edge-modifier-panel" aria-label={title}>
       <div className="edge-modifier-header">
         <div>
           <strong>{title}</strong>
@@ -217,8 +217,8 @@ export function EdgeModifierPanel({
       </div>
 
       <div className="edge-modifier-quick-actions">
-        <button type="button" disabled={!prepared || busy} onClick={onSelectAll}>All sharp edges</button>
-        <button type="button" disabled={!prepared || busy} onClick={onClear}>Clear</button>
+        <button type="button" data-testid="edge-modifier-select-all" disabled={!prepared || busy} onClick={onSelectAll}>All sharp edges</button>
+        <button type="button" data-testid="edge-modifier-clear" disabled={!prepared || busy} onClick={onClear}>Clear</button>
       </div>
 
       {appliedFeatureCount > 0 ? (
@@ -290,8 +290,8 @@ export function EdgeModifierPanel({
 
       {error ? <div className="edge-modifier-error" role="alert">{error}</div> : null}
       <div className="edge-modifier-footer">
-        <button type="button" className="secondary" onClick={onCancel}>Cancel</button>
-        <button type="button" className="primary" disabled={!prepared || busy || selectedCount === 0 || Boolean(error)} onClick={onApply}>
+        <button type="button" className="secondary" data-testid="edge-modifier-cancel" onClick={onCancel}>Cancel</button>
+        <button type="button" className="primary" data-testid="edge-modifier-apply" disabled={!prepared || busy || selectedCount === 0 || Boolean(error)} onClick={onApply}>
           {busy ? <LoaderCircle className="edge-modifier-spinner" size={17} /> : <Check size={17} />}
           Apply
         </button>

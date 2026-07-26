@@ -3,7 +3,7 @@
 import { Check, CloudUpload, Download, FolderOpen, X } from "lucide-react";
 import type manifoldModule from "manifold-3d";
 import type { ManifoldToplevel } from "manifold-3d";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { ADDITION, Brush, Evaluator, HOLLOW_INTERSECTION, HOLLOW_SUBTRACTION, INTERSECTION, SUBTRACTION, type CSGOperation } from "three-bvh-csg";
 import * as THREE from "three";
 import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
@@ -8705,7 +8705,7 @@ export function SketchForgeEditor({
           event.currentTarget.value = "";
         }}
       />
-      <div className="editor-toast" role="status">
+      <div className="editor-toast" data-testid="editor-toast" role="status">
         {notice}
       </div>
       <pre data-codex-state hidden>
@@ -8745,6 +8745,19 @@ function SketchReferenceIcon({ name }: { name: SketchReferenceIconName }) {
     />
   );
 }
+
+/**
+ * A ribbon button. `id` is stable and machine-facing (tests, and later the
+ * command registry); `label` is user-facing and translatable.
+ */
+type ToolbarButton = {
+  id: string;
+  label: string;
+  icon: (props: { className?: string }) => ReactElement;
+  action: () => void;
+  enabled: boolean;
+  active?: boolean;
+};
 
 function SecondaryToolbar({
   toolbarMode,
@@ -8886,39 +8899,50 @@ function SecondaryToolbar({
   useEffect(() => {
     if (sketchActive) setSketchCreateOpen(false);
   }, [sketchActive]);
-  const leftTools = [
-    { label: "Copy", icon: ToolbarCopyIcon, action: onCopy, enabled: hasSelection },
-    { label: "Paste", icon: ToolbarPasteIcon, action: onPaste, enabled: hasClipboard },
-    { label: "Duplicate", icon: ToolbarDuplicateIcon, action: onDuplicate, enabled: hasSelection },
-    { label: "Delete", icon: ToolbarTrashIcon, action: onDelete, enabled: hasSelection },
-    { label: "Undo", icon: ToolbarUndoIcon, action: onUndo, enabled: canUndo },
-    { label: "Redo", icon: ToolbarRedoIcon, action: onRedo, enabled: canRedo },
+  // `id` is a stable handle for automated tests and, later, the command
+  // registry. `label` is user-facing and will be translated; nothing may key off
+  // it.
+  const leftTools: ToolbarButton[] = [
+    { id: "copy", label: "Copy", icon: ToolbarCopyIcon, action: onCopy, enabled: hasSelection },
+    { id: "paste", label: "Paste", icon: ToolbarPasteIcon, action: onPaste, enabled: hasClipboard },
+    { id: "duplicate", label: "Duplicate", icon: ToolbarDuplicateIcon, action: onDuplicate, enabled: hasSelection },
+    { id: "delete", label: "Delete", icon: ToolbarTrashIcon, action: onDelete, enabled: hasSelection },
+    { id: "undo", label: "Undo", icon: ToolbarUndoIcon, action: onUndo, enabled: canUndo },
+    { id: "redo", label: "Redo", icon: ToolbarRedoIcon, action: onRedo, enabled: canRedo },
   ];
-  const visibilityTools = [
-    { label: "Hide selected", icon: ToolbarHideSelectedIcon, action: onToggleHidden, enabled: hasSelection },
-    { label: "Visibility options", icon: ToolbarCaretDownIcon, action: onTips, enabled: hasSelection },
+  const visibilityTools: ToolbarButton[] = [
+    { id: "hide-selected", label: "Hide selected", icon: ToolbarHideSelectedIcon, action: onToggleHidden, enabled: hasSelection },
+    { id: "visibility-options", label: "Visibility options", icon: ToolbarCaretDownIcon, action: onTips, enabled: hasSelection },
   ];
-  const combineTools = [
-    { label: "Group", icon: ToolbarGroupIcon, action: onGroup, enabled: canGroup },
-    { label: "Ungroup", icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup },
-    { label: "Boolean Intersection", icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect },
+  const combineTools: ToolbarButton[] = [
+    { id: "group", label: "Group", icon: ToolbarGroupIcon, action: onGroup, enabled: canGroup },
+    { id: "ungroup", label: "Ungroup", icon: ToolbarUngroupIcon, action: onUngroup, enabled: canUngroup },
+    { id: "intersect", label: "Boolean Intersection", icon: ToolbarIntersectionIcon, action: onIntersect, enabled: canIntersect },
   ];
-  const modifyTools = [
-    { label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
-    { label: "Mirror", icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection, active: mirrorMode },
-    { label: "Snap to grid", icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection },
-    { label: "Chamfer", icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" },
-    { label: "Fillet", icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
+  const modifyTools: ToolbarButton[] = [
+    { id: "align", label: "Align", icon: ToolbarAlignIcon, action: onAlign, enabled: canAlign, active: alignMode },
+    { id: "mirror", label: "Mirror", icon: ToolbarMirrorIcon, action: onMirror, enabled: hasSelection, active: mirrorMode },
+    { id: "snap", label: "Snap to grid", icon: ToolbarSnapGridIcon, action: onSnap, enabled: hasSelection },
+    { id: "chamfer", label: "Chamfer", icon: ToolbarChamferIcon, action: onChamfer, enabled: canEdgeModify, active: edgeModifierKind === "chamfer" },
+    { id: "fillet", label: "Fillet", icon: ToolbarFilletIcon, action: onFillet, enabled: canEdgeModify, active: edgeModifierKind === "fillet" },
   ];
-  const arrangeTools = [
-    { label: "Workplane", icon: ToolbarWorkplaneIcon, action: onWorkplaneTool, enabled: true, active: workplaneMode },
-    { label: "Drop to workplane", icon: ToolbarDropToWorkplaneIcon, action: onDropToWorkplane, enabled: hasSelection },
+  const arrangeTools: ToolbarButton[] = [
+    { id: "workplane", label: "Workplane", icon: ToolbarWorkplaneIcon, action: onWorkplaneTool, enabled: true, active: workplaneMode },
+    { id: "drop-to-workplane", label: "Drop to workplane", icon: ToolbarDropToWorkplaneIcon, action: onDropToWorkplane, enabled: hasSelection },
   ];
-  const renderToolButton = (tool: (typeof leftTools)[number] | (typeof visibilityTools)[number] | (typeof combineTools)[number] | (typeof modifyTools)[number] | (typeof arrangeTools)[number]) => {
-    const { icon: Icon, action, enabled, label } = tool;
-    const active = "active" in tool && Boolean(tool.active);
+  const renderToolButton = (tool: ToolbarButton) => {
+    const { icon: Icon, action, enabled, label, id } = tool;
+    const active = Boolean(tool.active);
     return (
-      <button className={`toolbar-icon ${enabled ? "" : "disabled"} ${active ? "active" : ""}`} key={label} aria-label={label} title={label} onClick={action} disabled={!enabled}>
+      <button
+        className={`toolbar-icon ${enabled ? "" : "disabled"} ${active ? "active" : ""}`}
+        key={id}
+        data-testid={`tool-${id}`}
+        aria-label={label}
+        title={label}
+        onClick={action}
+        disabled={!enabled}
+      >
         <Icon />
       </button>
     );
@@ -8955,6 +8979,7 @@ function SecondaryToolbar({
           <div className="toolbar-section-tools">
             <button
               className={`shape-menu-trigger ${shapesOpen ? "active" : ""}`}
+              data-testid="add-shape"
               aria-label="Add shape"
               aria-expanded={shapesOpen}
               onClick={() => setShapesOpen((value) => !value)}
@@ -8970,6 +8995,7 @@ function SecondaryToolbar({
                   <button
                     className="shape-menu-item"
                     key={shape.id}
+                    data-testid={`shape-menu-${shape.id}`}
                     type="button"
                     draggable={false}
                     onClick={() => {
@@ -9133,11 +9159,11 @@ function SecondaryToolbar({
                 <div className="toolbar-section sketch-finish-section">
                   <div className="toolbar-section-label">Finish</div>
                   <div className="toolbar-section-tools">
-                    <button className="sketch-command-button primary" type="button" onClick={onSketchFinish}>
+                    <button className="sketch-command-button primary" data-testid="sketch-finish" type="button" onClick={onSketchFinish}>
                       <Check />
                       <span>{sketchOperation === "revolve" ? "Finish revolve" : "Finish sketch"}</span>
                     </button>
-                    <button className="sketch-command-button cancel" type="button" onClick={onSketchCancel}>
+                    <button className="sketch-command-button cancel" data-testid="sketch-cancel" type="button" onClick={onSketchCancel}>
                       <X />
                       <span>Cancel</span>
                     </button>
@@ -9152,6 +9178,7 @@ function SecondaryToolbar({
                     <button
                       className={`sketch-command-button primary sketch-create-menu-trigger ${sketchCreateOpen ? "active" : ""}`}
                       type="button"
+                      data-testid="sketch-create-menu"
                       aria-label="Sketch to 3D options"
                       aria-haspopup="menu"
                       aria-expanded={sketchCreateOpen}
@@ -9163,11 +9190,11 @@ function SecondaryToolbar({
                     </button>
                     {sketchCreateOpen ? (
                       <div className="sketch-create-dropdown" role="menu" aria-label="Sketch to 3D method">
-                        <button type="button" role="menuitem" onClick={() => startSketch("extrude")}>
+                        <button type="button" role="menuitem" data-testid="sketch-start-extrude" onClick={() => startSketch("extrude")}>
                           <strong>Extrude sketch</strong>
                           <span>Raise the profile into a 3D shape</span>
                         </button>
-                        <button type="button" role="menuitem" onClick={() => startSketch("revolve")}>
+                        <button type="button" role="menuitem" data-testid="sketch-start-revolve" onClick={() => startSketch("revolve")}>
                           <strong>Revolve sketch</strong>
                           <span>Rotate the profile around an axis</span>
                         </button>
@@ -9187,6 +9214,7 @@ function SecondaryToolbar({
       <div className="toolbar-workspace-tabs" role="tablist" aria-label="Editor mode">
         <button
           className={toolbarMode === "geometry" ? "active" : ""}
+          data-testid="tab-geometry"
           type="button"
           role="tab"
           aria-selected={toolbarMode === "geometry"}
@@ -9196,6 +9224,7 @@ function SecondaryToolbar({
         </button>
         <button
           className={toolbarMode === "sketch" ? "active" : ""}
+          data-testid="tab-sketch"
           type="button"
           role="tab"
           aria-selected={toolbarMode === "sketch"}
