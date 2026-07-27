@@ -15,6 +15,8 @@ import gentilisBoldFontJson from "three/examples/fonts/gentilis_bold.typeface.js
 import helvetikerBoldFontJson from "three/examples/fonts/helvetiker_bold.typeface.json";
 import optimerBoldFontJson from "three/examples/fonts/optimer_bold.typeface.json";
 import { AlignOverlay, MirrorOverlay, type AlignOverlayState, type MirrorOverlayState } from "@/components/workplane/ActionOverlays";
+import { WebglUnavailable } from "@/components/workplane/WebglUnavailable";
+import { detectWebglSupport, type WebglStatus } from "@/lib/webglSupport";
 import { ShapeInspector, SnapGridControl, type ShapeInspectorUpdateOptions } from "@/components/workplane/ShapeInspector";
 import { WorkspaceSettingsModal } from "@/components/workplane/WorkspaceSettingsModal";
 import { createGearGeometry } from "@/lib/gearGeometry";
@@ -1606,6 +1608,12 @@ export function WorkplaneViewport({
   const lastResizeAnchorRef = useRef<ResizeAnchorMemory | null>(null);
   const suppressNextLiftEditRef = useRef(false);
   const snapRef = useRef(snap);
+  /*
+   * "ok" until proven otherwise: the probe runs in an effect, and starting from
+   * a failure state would flash the error card on every load before the browser
+   * had a chance to answer.
+   */
+  const [webglStatus, setWebglStatus] = useState<WebglStatus>("ok");
   const workspaceRef = useRef(workspace);
   const workspaceSettingsKeyRef = useRef(workspaceSettingsKey ?? null);
   const lastWorkspaceSettingsSyncRef = useRef("");
@@ -1903,7 +1911,30 @@ export function WorkplaneViewport({
       return;
     }
 
-    const state = createThreeScene(host);
+    /*
+     * A browser without WebGL is an ordinary situation, not a bug: an old
+     * laptop, a remote desktop session, a driver on the browser's blocklist,
+     * hardware acceleration switched off by policy. Before this guard the
+     * failure took the whole editor down with it — the ribbon, the model
+     * browser and the sketcher included, none of which need 3D.
+     */
+    const probe = detectWebglSupport();
+    if (probe.status !== "ok") {
+      setWebglStatus("unavailable");
+      return;
+    }
+
+    let state: ThreeState;
+    try {
+      state = createThreeScene(host);
+    } catch (error) {
+      // The probe can pass and the real renderer still fail: the driver may
+      // refuse a second context, or run out of memory on a large canvas.
+      console.warn("[SketchForge] the 3D viewport could not start", error);
+      setWebglStatus("creation-failed");
+      return;
+    }
+    setWebglStatus("ok");
     threeRef.current = state;
     rebuildWorkplane(state, workspaceRef.current);
     window.sketchforgeCaptureCanvas = () => {
@@ -3712,6 +3743,7 @@ export function WorkplaneViewport({
 
       <section className={`workplane-wrap ${workplaneMode ? "placing-workplane" : ""} ${rulerMode ? "ruler-mode" : ""} ${rulerDeleteMode ? "ruler-delete-mode" : ""} ${rulerMoveMode ? "ruler-move-mode" : ""} ${modifierActive ? "modifier-edge-pick" : ""}`} aria-label="Workplane">
         <div className="workplane-plane">
+          {webglStatus !== "ok" ? <WebglUnavailable status={webglStatus} /> : null}
           <div
             className="three-workplane-host"
             ref={hostRef}

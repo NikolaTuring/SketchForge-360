@@ -448,6 +448,16 @@ export const TRANSLATIONS = {
   "mesh.leftover": { en: "{count} triangles matched no analytic surface and would stay as facets.", de: "{count} Dreiecke passten auf keine analytische Fläche und blieben Facetten." },
   "mesh.cleanup": { en: "Cleaned up: {axes} axes snapped, {rounded} dimensions rounded, {coaxial} coaxial groups merged.", de: "Bereinigt: {axes} Achsen gefangen, {rounded} Maße gerundet, {coaxial} koaxiale Gruppen zusammengefasst." },
 
+  // --- No WebGL -----------------------------------------------------------
+  "webgl.title": { en: "This browser cannot show the 3D view", de: "Dieser Browser kann die 3D-Ansicht nicht anzeigen" },
+  "webgl.lead": { en: "The 3D viewport needs WebGL, and this browser could not start it. That is a browser or graphics-driver setting, not a problem with your project — nothing has been lost.", de: "Die 3D-Ansicht braucht WebGL, und dieser Browser konnte es nicht starten. Das liegt an einer Browser- oder Treibereinstellung, nicht an deinem Projekt – es ist nichts verloren gegangen." },
+  "webgl.leadLost": { en: "The 3D view stopped because the graphics driver dropped its connection. Reloading the page usually brings it back.", de: "Die 3D-Ansicht ist ausgefallen, weil der Grafiktreiber die Verbindung verloren hat. Ein Neuladen der Seite hilft meistens." },
+  "webgl.stepBrowser": { en: "Try a different browser. On Windows, Edge is already installed and uses a different graphics path.", de: "Einen anderen Browser probieren. Unter Windows ist Edge bereits installiert und nutzt eine andere Grafikanbindung." },
+  "webgl.stepAcceleration": { en: "Switch hardware acceleration on in the browser settings, under Performance.", de: "Im Browser unter „Leistung\u201c die Hardwarebeschleunigung einschalten." },
+  "webgl.stepDriver": { en: "Update the graphics driver. Remote desktop sessions and virtual machines often have no 3D at all.", de: "Den Grafiktreiber aktualisieren. Remote-Desktop-Sitzungen und virtuelle Maschinen haben oft gar kein 3D." },
+  "webgl.diagnose": { en: "The exact reason is in about:support (Firefox) or chrome://gpu (Chrome and Edge), under Graphics.", de: "Den genauen Grund nennt about:support (Firefox) bzw. chrome://gpu (Chrome und Edge) im Abschnitt Grafik." },
+  "webgl.sketchStillWorks": { en: "Sketching still works: drawing, relations and dimensions need no 3D. Only the finished body cannot be shown.", de: "Skizzieren geht weiterhin: Zeichnen, Beziehungen und Bemaßung brauchen kein 3D. Nur der fertige Körper lässt sich nicht anzeigen." },
+
   "parameters.title": { en: "Parameters", de: "Parameter" },
   "parameters.empty": { en: "No parameters yet. Add one to reuse a value across dimensions.", de: "Noch keine Parameter. Einen anlegen, um einen Wert mehrfach zu nutzen." },
   "parameters.name": { en: "Name", de: "Name" },

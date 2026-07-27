@@ -6768,3 +6768,75 @@ button {
   border-radius: 3px;
   cursor: pointer;
 }
+
+/* ---------------------------------------------------------------------------
+ * No WebGL
+ * ------------------------------------------------------------------------ */
+
+/* Covers the canvas host rather than replacing it: the host stays mounted so a
+ * later reload can try again without the surrounding layout shifting. */
+.webgl-unavailable {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  overflow-y: auto;
+  background: var(--sf-surface);
+}
+
+.webgl-unavailable-card {
+  max-width: 520px;
+  padding: 24px 28px;
+  color: var(--sf-text);
+  background: var(--sf-surface-raised);
+  border: 1px solid var(--sf-line);
+  border-radius: 8px;
+  box-shadow: 0 14px 38px var(--sf-shadow);
+}
+
+.webgl-unavailable-card h2 {
+  margin: 0 0 10px;
+  color: var(--sf-text-strong);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.webgl-unavailable-card p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.webgl-unavailable-card ol {
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.webgl-unavailable-card li {
+  margin-bottom: 5px;
+}
+
+.webgl-diagnose {
+  color: var(--sf-text-muted);
+  font-size: 12px !important;
+}
+
+/* The useful part: the work is not blocked, only the 3D view is. */
+.webgl-still-works {
+  margin: 0 !important;
+  padding: 10px 12px;
+  color: #1c6b3f;
+  font-size: 12.5px !important;
+  font-weight: 700;
+  background: #e6f4ea;
+  border-radius: 4px;
+}
+
+:root[data-theme="dark"] .webgl-still-works {
+  color: #86d5a4;
+  background: rgba(28, 107, 63, 0.22);
+}
